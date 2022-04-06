@@ -36,14 +36,7 @@ CLASSIFIERS = [
 ]
 
 # What packages are required for this module to be executed?
-INSTALL_REQUIRED = [
-    'deepdiff>=4.0.6',
-    'gcloud>=0.18.3',
-    'google-api-python-client>=2.36.0',
-    'google-cloud-secret-manager>=2.7.2',
-    'grpcio>=1.43.0',
-    'stringcase>=1.2.0',
-]
+INSTALL_REQUIRED = [line.strip() for line in open("requirements.txt").readlines()]
 
 DEBUG_REQUIRED = [
     'ipython>=7.5.0',
