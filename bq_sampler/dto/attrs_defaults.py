@@ -19,3 +19,8 @@ ATTRS_DEFAULTS: Dict[str, Any] = dict(
     frozen=True,
     slots=True,
 )
+"""
+See `attrs`_ documentation for details.
+
+.. _attrs: https://www.attrs.org/en/stable/api.html#attr.s
+"""

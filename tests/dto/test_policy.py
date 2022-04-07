@@ -20,7 +20,7 @@ _TEST_COLUMN: str = "TEST_COLUMN"
 _TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
     sort_by=_TEST_COLUMN, sort_direction=sample.SortDirection.ASC.value
 )
-_TEST_SORT_ALGORITHM: sample._SortAlgorithm = sample._SortAlgorithm(
+_TEST_SORT_ALGORITHM: sample.SortAlgorithm = sample.SortAlgorithm(
     type=sample.SortType.RELATIONAL.value, properties=_TEST_SORT_PROPERTIES
 )
 _TEST_SAMPLE: sample.Sample = sample.Sample(
@@ -28,10 +28,15 @@ _TEST_SAMPLE: sample.Sample = sample.Sample(
 )
 
 
+_TEST_POLICY: policy.Policy = policy.Policy(
+    sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE
+)
+
+
 @pytest.mark.incremental
 class TestPolicy:
     @pytest.mark.parametrize(
-        'sample_size_limit,sample_size_default',
+        'sample_size_limit,default_sample',
         [
             (None, None),
             (_TEST_SAMPLE_SIZE, None),
@@ -39,26 +44,70 @@ class TestPolicy:
             (_TEST_SAMPLE_SIZE, _TEST_SAMPLE),
         ],
     )
-    def test_ctor_ok(
-        self, sample_size_limit: sample.SampleSize, sample_size_default: sample.Sample
-    ):
-        obj = policy.Policy(
-            sample_size_limit=sample_size_limit, sample_size_default=sample_size_default
-        )
+    def test_ctor_ok(self, sample_size_limit: sample.SampleSize, default_sample: sample.Sample):
+        obj = policy.Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
         assert obj.sample_size_limit == sample_size_limit
-        assert obj.sample_size_default == sample_size_default
-        assert obj == policy.Policy.from_dict(attrs.asdict(obj))
+        assert obj.default_sample == default_sample
+        obj_dict = attrs.asdict(obj)
+        assert obj == policy.Policy.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
-        'sample_size_limit,sample_size_default',
+        'sample_size_limit,default_sample',
         [
             (attrs.asdict(_TEST_SAMPLE_SIZE), None),
             (None, attrs.asdict(_TEST_SAMPLE)),
             (attrs.asdict(_TEST_SAMPLE_SIZE), attrs.asdict(_TEST_SAMPLE)),
         ],
     )
-    def test_ctor_nok_type(self, sample_size_limit: Any, sample_size_default: Any):
+    def test_ctor_nok_type(self, sample_size_limit: Any, default_sample: Any):
         with pytest.raises(TypeError):
-            policy.Policy(
-                sample_size_limit=sample_size_limit, sample_size_default=sample_size_default
-            )
+            policy.Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
+
+    def test_overwrite_with_ok_sample_size_limit_changed(self):
+        obj = policy.Policy(sample_size_limit=None, default_sample=_TEST_SAMPLE)
+        result = obj.overwrite_with(_TEST_POLICY)
+        assert result.sample_size_limit is not None
+
+    def test_overwrite_with_ok_default_sample_changed(self):
+        obj = policy.Policy(sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=None)
+        result = obj.overwrite_with(_TEST_POLICY)
+        assert result.default_sample is not None
+
+    def test_overwrite_with_ok_return_self_value_is_none(self):
+        obj = policy.Policy(sample_size_limit=None, default_sample=None)
+        result = obj.overwrite_with(None)
+        assert result == obj
+
+
+_TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
+_TEST_DATASET_ID: str = 'TEST_DATASET_ID'
+_TEST_TABLE_ID: str = 'TEST_TABLE_ID'
+_TEST_REGION: str = 'TEST_REGION'
+_TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
+    project_id=_TEST_PROJECT_ID,
+    dataset_id=_TEST_DATASET_ID,
+    table_id=_TEST_TABLE_ID,
+    region=_TEST_REGION,
+)
+
+
+@pytest.mark.incremental
+class TestTablePolicy:
+    def test_ctor_ok(self):
+        obj = policy.TablePolicy(table_reference=_TEST_TABLE_REFERENCE, policy=_TEST_POLICY)
+        assert obj.table_reference == _TEST_TABLE_REFERENCE
+        assert obj.policy == _TEST_POLICY
+        obj_dict = attrs.asdict(obj)
+        assert obj == policy.TablePolicy.from_dict(obj_dict)
+
+    @pytest.mark.parametrize(
+        'table_reference,policy_arg',
+        [
+            (None, None),
+            (_TEST_TABLE_REFERENCE, None),
+            (None, _TEST_POLICY),
+        ],
+    )
+    def test_ctor_nok_type(self, table_reference: Any, policy_arg: Any):
+        with pytest.raises(TypeError):
+            policy.TablePolicy(table_reference=table_reference, policy=policy_arg)
