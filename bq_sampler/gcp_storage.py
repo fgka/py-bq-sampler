@@ -7,7 +7,7 @@ Reads an object from `Cloud Storage`_.
 """
 # pylint: enable=line-too-long
 import logging
-from typing import Callable, List, Optional
+from typing import Callable, Generator, Optional
 
 import cachetools
 
@@ -63,7 +63,9 @@ def _accept_all_list_objects(value: str) -> bool:  # pylint: disable=unused-argu
     return True
 
 
-def list_objects(bucket_name: str, filter_fn: Optional[Callable[[str], bool]] = None) -> List[str]:
+def list_objects(
+    bucket_name: str, filter_fn: Optional[Callable[[str], bool]] = None
+) -> Generator[str, None, None]:
     # pylint: disable=line-too-long
     """
     This function is just wrapper around GSC client `list_blobs`_ method.
@@ -107,16 +109,19 @@ def list_objects(bucket_name: str, filter_fn: Optional[Callable[[str], bool]] = 
     # if no filter, accept all
     if filter_fn is None:
         filter_fn = _accept_all_list_objects
-    result = []
-    for blob in _client().list_blobs(bucket_name):
+    for obj_path in _list_blob_names(bucket_name):
         try:
-            if filter_fn(blob.name):
-                result.append(blob.name)
+            if filter_fn(obj_path):
+                yield obj_path
         except Exception as err:
             msg = (
-                f'Could not add blob named <{blob.name}> from bucket <{bucket_name}>. '
+                f'Could not add blob named <{obj_path}> from bucket <{bucket_name}>. '
                 f'Stopping list now. Error: <{err}>'
             )
             logging.critical(msg)
             raise CloudStorageListError(msg) from err
-    return result
+
+
+def _list_blob_names(bucket_name: str) -> Generator[str, None, None]:
+    for blob in _client().list_blobs(bucket_name):
+        yield blob.name

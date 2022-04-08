@@ -1,0 +1,14 @@
+{
+  "__doc__": "NON JSON file, percentage is not quoted. Should be loaded as empty",
+  "sample_size": {
+    "count": 17,
+    percentage: 11.1
+  },
+  "sort_algorithm": {
+    "type": "relational",
+    "properties": {
+      "sort_by": "TEST_COLUMN_B",
+      "sort_direction": "ASC"
+    }
+  }
+}

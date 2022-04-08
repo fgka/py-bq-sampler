@@ -2,9 +2,7 @@
 """
 DTOs to encode the sample request.
 """
-import enum
-import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import attrs
 
@@ -12,7 +10,7 @@ from bq_sampler.dto import attrs_defaults
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class SampleSize:  # pylint: disable=too-few-public-methods
+class SampleSize(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     Sample size as in::
         sample_size = {
@@ -31,66 +29,8 @@ class SampleSize:  # pylint: disable=too-few-public-methods
         ),
     )
 
-    def overwrite_with(self, value: Optional[Any]) -> Any:
-        """
-        Creates a new instance of :py:class:`SampleSize` where:
-        - the current object as either `count` or `percentage` is defined;
-        - if all is attributes are :py:obj:`None` returns `value`.
 
-        :param value:
-        :return:
-        """
-        result = self
-        if self.is_empty() and isinstance(value, SampleSize):
-            result = value
-        return result
-
-    def is_empty(self) -> bool:
-        """
-        Returns :py:obj:`True` if all attributes are :py:obj:`None`.
-        :return:
-        """
-        return self.count is None and self.percentage is None
-
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:  # pylint: disable=duplicate-code
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`SampleSize`.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            try:
-                result = cls(count=value.get('count'), percentage=value.get('percentage'))
-            except Exception as err:  # pylint: disable=broad-except
-                logging.warning(
-                    'Could not parse %s from dictionary <%s>. Error: %s', cls.__name__, value, err
-                )
-        return result
-
-
-class _EnumWithFromStrIgnoreCase(enum.Enum):
-    @classmethod
-    def from_str(cls, value: str) -> Any:
-        """
-        Parses a string value into corresponding :py:class:`enum.Enum`
-        comparing it with the values and ignoring case.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if value is not None:
-            for val in cls:
-                if val.value.lower() == value.lower().strip():
-                    result = val
-                    break
-        return result
-
-
-class SortDirection(_EnumWithFromStrIgnoreCase):
+class SortDirection(attrs_defaults.EnumWithFromStrIgnoreCase):
     """
     Available sorting directions.
     """
@@ -100,7 +40,7 @@ class SortDirection(_EnumWithFromStrIgnoreCase):
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class _SortProperties:  # pylint: disable=too-few-public-methods
+class _SortProperties(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO for sort properties as in::
         sort_properties = {
@@ -131,28 +71,8 @@ class _SortProperties:  # pylint: disable=too-few-public-methods
                 f' got: <{value}>'
             )
 
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`Policy`.
 
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            try:
-                result = cls(
-                    sort_by=value.get('sort_by'), sort_direction=value.get('sort_direction')
-                )
-            except Exception as err:  # pylint: disable=broad-except
-                logging.warning(
-                    'Could not parse %s from dictionary <%s>. Error: %s', cls.__name__, value, err
-                )
-        return result
-
-
-class SortType(_EnumWithFromStrIgnoreCase):
+class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
     """
     Which type of sorting is supported in the sample.
     """
@@ -162,11 +82,16 @@ class SortType(_EnumWithFromStrIgnoreCase):
 
     @classmethod
     def default(cls) -> Any:
+        """
+        Returns the default sorting strategy.
+
+        :return:
+        """
         return SortType.RANDOM
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class SortAlgorithm:  # pylint: disable=too-few-public-methods
+class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO for the sort algorithm as in::
         sort_algorithm = {
@@ -199,28 +124,9 @@ class SortAlgorithm:  # pylint: disable=too-few-public-methods
                 f' got: <{value}>'
             )
 
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`Policy`.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            try:
-                properties = _SortProperties.from_dict(value.get('properties'))
-                result = SortAlgorithm(type=value.get('type'), properties=properties)
-            except Exception as err:  # pylint: disable=broad-except
-                logging.warning(
-                    'Could not parse %s from dictionary <%s>. Error: %s', cls.__name__, value, err
-                )
-        return result
-
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class Sample:  # pylint: disable=too-few-public-methods
+class Sample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO for a sample definition as in::
         sample = {
@@ -247,55 +153,24 @@ class Sample:  # pylint: disable=too-few-public-methods
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(SortAlgorithm)),
     )
 
-    def overwrite_with(self, value: Optional[Any]) -> Any:
+    def return_value_if_empty(self, value: Any) -> Any:
         """
-        Creates a new instance of :py:class:`Sample`
-        where its attributes are the result of calling `overwrite_with` on them.
-
+        Merge strategy instead of empty.
         :param value:
         :return:
         """
-        result = self
-        if self.is_emtpy() and isinstance(value, Sample):
-            sample_size = (
-                self.sample_size.overwrite_with(value.sample_size)
-                if self.sample_size is not None
-                else value.sample_size
-            )
-            sort_algorithm = (
-                self.sort_algorithm
-                if self.sort_algorithm is not None
-                else value.sort_algorithm
-            )
-            result = Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
-        return result
-
-    def is_emtpy(self) -> bool:
-        """
-        Returns :py:obj:`True` if all attributes are :py:obj:`None`.
-        :return:
-        """
-        return self.sample_size is None and self.sort_algorithm is None
-
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`Policy`.
-
-        :param value:
-        :return:
-        """
-        if isinstance(value, dict):
-            sample_size = SampleSize.from_dict(value.get('sample_size'))
-            sort_algorithm = SortAlgorithm.from_dict(value.get('sort_algorithm'))
-            result = cls(sample_size=sample_size, sort_algorithm=sort_algorithm)
-        else:
-            result = Sample()
-        return result
+        sample_size = self.sample_size
+        sort_algorithm = self.sort_algorithm
+        if isinstance(value, Sample):
+            if sample_size is None:
+                sample_size = value.sample_size
+            if sort_algorithm is None:
+                sort_algorithm = value.sort_algorithm
+        return Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class TableReference:  # pylint: disable=too-few-public-methods
+class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to fully specify a table location
     """
@@ -308,27 +183,9 @@ class TableReference:  # pylint: disable=too-few-public-methods
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(str)),
     )
 
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`TableReference`.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            result = cls(
-                project_id=value.get('project_id'),
-                dataset_id=value.get('dataset_id'),
-                table_id=value.get('table_id'),
-                region=value.get('region'),
-            )
-        return result
-
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class TableSample:  # pylint: disable=too-few-public-methods
+class TableSample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the sample
     """
@@ -337,18 +194,3 @@ class TableSample:  # pylint: disable=too-few-public-methods
         validator=attrs.validators.instance_of(TableReference)
     )
     sample: Sample = attrs.field(validator=attrs.validators.instance_of(Sample))
-
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`TableSample`.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            table_reference = TableReference.from_dict(value.get('table_reference'))
-            sample = Sample.from_dict(value.get('sample'))
-            result = cls(table_reference=table_reference, sample=sample)
-        return result

@@ -2,7 +2,7 @@
 """
 DTO for the sample policy to be used to validate given sample request.
 """
-from typing import Any, Dict, Optional
+from typing import Any
 
 import attrs
 
@@ -11,7 +11,7 @@ from bq_sampler.dto import sample
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class Policy:  # pylint: disable=too-few-public-methods
+class Policy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     Holds the DTO corresponding to a sample policy, as in::
         policy = {
@@ -46,44 +46,20 @@ class Policy:  # pylint: disable=too-few-public-methods
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(sample.Sample)),
     )
 
-    def overwrite_with(self, value: Optional[Any]) -> Any:
+    def return_value_if_empty(self, value: Any) -> Any:
         """
-        Creates a new instance of :py:class:`Policy` where its attributes
-        are the result of calling `overwrite_with` on them.
-
+        Merge strategy instead of empty.
         :param value:
         :return:
         """
-        result = self
+        sample_size_limit = self.sample_size_limit
+        default_sample = self.default_sample
         if isinstance(value, Policy):
-            sample_size_limit = (
-                self.sample_size_limit.overwrite_with(value.sample_size_limit)
-                if self.sample_size_limit is not None
-                else value.sample_size_limit
-            )
-            default_sample = (
-                self.default_sample.overwrite_with(value.default_sample)
-                if self.default_sample is not None
-                else value.default_sample
-            )
-            result = Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
-        return result
-
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:  # pylint: disable=duplicate-code
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`Policy`.
-
-        :param value:
-        :return:
-        """
-        if isinstance(value, dict):
-            sample_size_limit = sample.SampleSize.from_dict(value.get('sample_size_limit'))
-            default_sample = sample.Sample.from_dict(value.get('default_sample'))
-            result = cls(sample_size_limit=sample_size_limit, default_sample=default_sample)
-        else:
-            result = Policy()
-        return result
+            if sample_size_limit is None:
+                sample_size_limit = value.sample_size_limit
+            if default_sample is None:
+                default_sample = value.default_sample
+        return Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
 
 
 FALLBACK_GENERIC_POLICY: Policy = Policy(
@@ -99,7 +75,7 @@ To be used as the absolute minimum default policy.
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class TablePolicy:  # pylint: disable=too-few-public-methods
+class TablePolicy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the policy
     """
@@ -108,18 +84,3 @@ class TablePolicy:  # pylint: disable=too-few-public-methods
         validator=attrs.validators.instance_of(sample.TableReference)
     )
     policy: Policy = attrs.field(validator=attrs.validators.instance_of(Policy))
-
-    @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:
-        """
-        Converts a simple :py:class:`dict` into a :py:class:`TablePolicy`.
-
-        :param value:
-        :return:
-        """
-        result = None
-        if isinstance(value, dict):
-            table_reference = sample.TableReference.from_dict(value.get('table_reference'))
-            policy = Policy.from_dict(value.get('policy'))
-            result = cls(table_reference=table_reference, policy=policy)
-        return result

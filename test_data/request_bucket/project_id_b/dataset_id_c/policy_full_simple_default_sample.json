@@ -1,0 +1,14 @@
+{
+  "__doc__": "Full request to a policy that only specifies the default sampling",
+  "sample_size": {
+    "count": 17,
+    "percentage": "11.1"
+  },
+  "sort_algorithm": {
+    "type": "relational",
+    "properties": {
+      "sort_by": 123,
+      "sort_direction": "ASC"
+    }
+  }
+}

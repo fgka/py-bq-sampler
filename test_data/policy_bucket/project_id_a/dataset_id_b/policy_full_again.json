@@ -1,0 +1,20 @@
+{
+  "__doc__": "Redefines each attribute in the general policy",
+  "sample_size_limit": {
+    "count": 1050,
+    "percentage": 35.1
+  },
+  "default_sample": {
+    "sample_size": {
+      "count": 9,
+      "percentage": 6.5
+    },
+    "sort_algorithm": {
+      "type": "random",
+      "properties": {
+        "sort_by": "TEST_COLUMN_D",
+        "sort_direction": "ASC"
+      }
+    }
+  }
+}

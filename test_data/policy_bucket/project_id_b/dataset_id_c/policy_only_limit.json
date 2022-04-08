@@ -1,0 +1,7 @@
+{
+  "__doc__": "Only overwrites the sample size from the general policy",
+  "sample_size_limit": {
+    "count": 1100,
+    "percentage": 20.1
+  }
+}

@@ -28,11 +28,6 @@ _TEST_SAMPLE: sample.Sample = sample.Sample(
 )
 
 
-_TEST_POLICY: policy.Policy = policy.Policy(
-    sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE
-)
-
-
 @pytest.mark.incremental
 class TestPolicy:
     @pytest.mark.parametrize(
@@ -63,21 +58,6 @@ class TestPolicy:
         with pytest.raises(TypeError):
             policy.Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
 
-    def test_overwrite_with_ok_sample_size_limit_changed(self):
-        obj = policy.Policy(sample_size_limit=None, default_sample=_TEST_SAMPLE)
-        result = obj.overwrite_with(_TEST_POLICY)
-        assert result.sample_size_limit is not None
-
-    def test_overwrite_with_ok_default_sample_changed(self):
-        obj = policy.Policy(sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=None)
-        result = obj.overwrite_with(_TEST_POLICY)
-        assert result.default_sample is not None
-
-    def test_overwrite_with_ok_return_self_value_is_none(self):
-        obj = policy.Policy(sample_size_limit=None, default_sample=None)
-        result = obj.overwrite_with(None)
-        assert result == obj
-
 
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
 _TEST_DATASET_ID: str = 'TEST_DATASET_ID'
@@ -88,6 +68,9 @@ _TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
     dataset_id=_TEST_DATASET_ID,
     table_id=_TEST_TABLE_ID,
     region=_TEST_REGION,
+)
+_TEST_POLICY: policy.Policy = policy.Policy(
+    sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE
 )
 
 

@@ -1,7 +1,7 @@
 # vim: ai:sw=4:ts=4:sta:et:fo=croql
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring
 # pylint: disable=missing-function-docstring,assignment-from-no-return,c-extension-no-member
-# pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
+# pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test,duplicate-code
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
 
@@ -12,8 +12,6 @@ import pytest
 import attrs
 
 from bq_sampler.dto import sample
-
-_TEST_SAMPLE_SIZE: sample.SampleSize = sample.SampleSize(count=31, percentage=57.986)
 
 
 @pytest.mark.incremental
@@ -32,7 +30,9 @@ class TestSampleSize:
         ],
     )
     def test_ctor_ok(self, count: int, percentage: float):
+        # Given/When
         obj = sample.SampleSize(count=count, percentage=percentage)
+        # Then
         assert obj.count == count
         assert obj.percentage == percentage
         obj_dict = attrs.asdict(obj)
@@ -56,49 +56,6 @@ class TestSampleSize:
         with pytest.raises(ValueError):
             sample.SampleSize(count=count, percentage=percentage)
 
-    @pytest.mark.parametrize(
-        'count,percentage',
-        [
-            (2000, None),
-            (None, 23.57),
-            (17, 31.9),
-        ],
-    )
-    def test_overwrite_with_ok_return_self(self, count: int, percentage: float):
-        obj = sample.SampleSize(count=count, percentage=percentage)
-        result = obj.overwrite_with(_TEST_SAMPLE_SIZE)
-        assert result == obj
-
-    def test_overwrite_with_ok_return_self_value_is_none(self):
-        obj = sample.SampleSize(count=None, percentage=None)
-        result = obj.overwrite_with(None)
-        assert result == obj
-
-    def test_overwrite_with_ok_return_value(self):
-        obj = sample.SampleSize(count=None, percentage=None)
-        result = obj.overwrite_with(_TEST_SAMPLE_SIZE)
-        assert result == _TEST_SAMPLE_SIZE
-
-
-@pytest.mark.incremental
-class TestSortDirection:
-    def test_from_str_ok(self):
-        for d in sample.SortDirection:
-            assert d == sample.SortDirection.from_str(d.value.lower())
-
-    def test_from_str_none(self):
-        assert sample.SortDirection.from_str(None) is None
-
-    def test_from_str_nok(self):
-        for d in sample.SortDirection:
-            assert sample.SortDirection.from_str(d.value.lower() + "_NOT") is None
-
-
-_TEST_COLUMN: str = "TEST_COLUMN"
-_TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
-    sort_by=_TEST_COLUMN, sort_direction=sample.SortDirection.ASC.value
-)
-
 
 @pytest.mark.incremental
 class Test_SortProperties:
@@ -110,7 +67,9 @@ class Test_SortProperties:
         ],
     )
     def test_ctor_ok(self, sort_by: str, sort_direction: str):
+        # Given/When
         obj = sample._SortProperties(sort_by=sort_by, sort_direction=sort_direction)
+        # Then
         assert obj.sort_by == sort_by
         assert obj.sort_direction == sort_direction
         obj_dict = attrs.asdict(obj)
@@ -143,37 +102,20 @@ class Test_SortProperties:
         with pytest.raises(ValueError):
             sample._SortProperties(sort_by=sort_by, sort_direction=sort_direction)
 
-    def test_overwrite_with_ok_return_self(self):
-        obj = sample._SortProperties(
-            sort_by="my_column", sort_direction=sample.SortDirection.ASC.value
-        )
-        result = obj.overwrite_with(None)
-        assert result == obj
-
-    def test_overwrite_with_ok_return_value(self):
-        obj = sample._SortProperties(
-            sort_by="my_column", sort_direction=sample.SortDirection.ASC.value
-        )
-        result = obj.overwrite_with(_TEST_SORT_PROPERTIES)
-        assert result == _TEST_SORT_PROPERTIES
-
 
 @pytest.mark.incremental
 class TestSortType:
-    def test_from_str_ok(self):
-        for d in sample.SortType:
-            assert d == sample.SortType.from_str(d.value.lower())
-
-    def test_from_str_none(self):
-        assert sample.SortType.from_str(None) is None
-
-    def test_from_str_nok(self):
-        for d in sample.SortType:
-            assert sample.SortType.from_str(d.value.lower() + "_NOT") is None
+    def test_default_ok(self):
+        # Given/When
+        result = sample.SortType.default()
+        # Then
+        assert result in sample.SortType
 
 
-_TEST_SORT_ALGORITHM: sample.SortAlgorithm = sample.SortAlgorithm(
-    type=sample.SortType.RELATIONAL.value, properties=_TEST_SORT_PROPERTIES
+_TEST_SAMPLE_SIZE: sample.SampleSize = sample.SampleSize(count=31, percentage=57.986)
+_TEST_COLUMN: str = "TEST_COLUMN"
+_TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
+    sort_by=_TEST_COLUMN, sort_direction=sample.SortDirection.ASC.value
 )
 
 
@@ -201,30 +143,10 @@ class TestSortAlgorithm:
             with pytest.raises(ValueError):
                 sample.SortAlgorithm(type=t.value + "_NOT", properties=_TEST_SORT_PROPERTIES)
 
-    @pytest.mark.parametrize(
-        'type,properties',
-        [
-            (None, _TEST_SORT_PROPERTIES),
-            (sample.SortType.RANDOM.value, None),
-        ],
-    )
-    def test_overwrite_with_ok_return_self(self, type: str, properties: sample._SortProperties):
-        obj = sample.SortAlgorithm(type=type, properties=properties)
-        result = obj.overwrite_with(_TEST_SORT_ALGORITHM)
-        assert result == obj
 
-    def test_overwrite_with_ok_return_self_value_is_none(self):
-        obj = sample.SortAlgorithm(type=None, properties=None)
-        result = obj.overwrite_with(None)
-        assert result == obj
-
-    def test_overwrite_with_ok_return_value(self):
-        obj = sample.SortAlgorithm(type=None, properties=None)
-        result = obj.overwrite_with(_TEST_SORT_ALGORITHM)
-        assert result == _TEST_SORT_ALGORITHM
-
-
-_TEST_SAMPLE_SIZE: sample.SampleSize = sample.SampleSize(count=17, percentage=11.1)
+_TEST_SORT_ALGORITHM: sample.SortAlgorithm = sample.SortAlgorithm(
+    type=sample.SortType.RELATIONAL.value, properties=_TEST_SORT_PROPERTIES
+)
 _TEST_SAMPLE: sample.Sample = sample.Sample(
     sample_size=_TEST_SAMPLE_SIZE, sort_algorithm=_TEST_SORT_ALGORITHM
 )
@@ -259,21 +181,6 @@ class TestSample:
     def test_ctor_nok_type(self, sample_size: Any, sort_algorithm: Any):
         with pytest.raises(TypeError):
             sample.Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
-
-    def test_overwrite_with_ok_sample_size_changed(self):
-        obj = sample.Sample(sample_size=None, sort_algorithm=_TEST_SORT_ALGORITHM)
-        result = obj.overwrite_with(_TEST_SAMPLE)
-        assert result.sample_size is not None
-
-    def test_overwrite_with_ok_sort_algorithm_changed(self):
-        obj = sample.Sample(sample_size=_TEST_SAMPLE_SIZE, sort_algorithm=None)
-        result = obj.overwrite_with(_TEST_SAMPLE)
-        assert result.sort_algorithm is not None
-
-    def test_overwrite_with_ok_return_self_value_is_none(self):
-        obj = sample.Sample(sample_size=None, sort_algorithm=None)
-        result = obj.overwrite_with(None)
-        assert result == obj
 
 
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'

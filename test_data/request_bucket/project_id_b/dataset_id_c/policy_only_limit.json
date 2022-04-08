@@ -1,0 +1,10 @@
+{
+  "__doc__": "Only the sorting is specified in a policy that only establish limits",
+  "sort_algorithm": {
+    "type": "relational",
+    "properties": {
+      "sort_by": "TEST_COLUMN_C",
+      "sort_direction": "DESC"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "__doc__": "Only specifies the size, but the policy file is invalid JSON, this should still count to allow the sampling",
+  "sample_size": {
+    "count": 18,
+    "percentage": 11.2
+  }
+}
