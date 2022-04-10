@@ -13,7 +13,7 @@ from bq_sampler.dto import attrs_defaults
 class SampleSize(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     Sample size as in::
-        sample_size = {
+        size = {
             "count": 123,
             "percentage": 10.1,
         }
@@ -44,16 +44,18 @@ class _SortProperties(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pu
     """
     DTO for sort properties as in::
         sort_properties = {
-            "sort_by": "my_column",
-            "sort_direction": "DESC"
+            "by": "my_column",
+            "direction": "DESC"
         }
     """
 
-    sort_by: str = attrs.field(validator=attrs.validators.instance_of(str))
-    sort_direction: str = attrs.field(validator=attrs.validators.instance_of(str))
+    by: str = attrs.field(  # pylint: disable=invalid-name
+        validator=attrs.validators.instance_of(str)
+    )
+    direction: str = attrs.field(validator=attrs.validators.instance_of(str))
 
-    @sort_by.validator
-    def _is_sort_by_valid(  # pylint: disable=no-self-use
+    @by.validator
+    def _is_by_valid(  # pylint: disable=no-self-use
         self, attribute: attrs.Attribute, value: Any
     ) -> None:
         if not value or value.strip() != value:
@@ -61,8 +63,8 @@ class _SortProperties(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pu
                 f'Attribute <{attribute.name}> must be a non-empty stripped string, got: <{value}>'
             )
 
-    @sort_direction.validator
-    def _is_sort_direction_valid(  # pylint: disable=no-self-use
+    @direction.validator
+    def _is_direction_valid(  # pylint: disable=no-self-use
         self, attribute: attrs.Attribute, value: Any
     ) -> None:
         if not SortDirection.from_str(value):
@@ -78,7 +80,7 @@ class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
     """
 
     RANDOM = "random"
-    RELATIONAL = "relational"
+    SORTED = "sorted"
 
     @classmethod
     def default(cls) -> Any:
@@ -95,10 +97,10 @@ class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-publ
     """
     DTO for the sort algorithm as in::
         sort_algorithm = {
-            "type": "relational",
+            "type": "sorted",
             "properties": {
-                "sort_by": "my_column",
-                "sort_direction": "DESC"
+                "by": "my_column",
+                "direction": "DESC"
             }
         }
     """
@@ -126,47 +128,94 @@ class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-publ
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class Sample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO for a sample definition as in::
         sample = {
-            "sample_size": {
+            "size": {
                 "count": 123,
                 "percentage": 19.2
             },
-            "sort_algorithm": {
-                "type": "relational",
+            "spec": {
+                "type": "sorted",
                 "properties": {
-                    "sort_by": "my_column",
-                    "sort_direction": "DESC"
+                    "by": "my_column",
+                    "direction": "DESC"
                 }
             }
         }
     """
 
-    sample_size: SampleSize = attrs.field(
+    size: SampleSize = attrs.field(
         default=None,
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(SampleSize)),
     )
-    sort_algorithm: SortAlgorithm = attrs.field(
+    spec: SortAlgorithm = attrs.field(
         default=None,
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(SortAlgorithm)),
     )
 
-    def return_value_if_empty(self, value: Any) -> Any:
+    def patch_is_substitution(self) -> bool:
         """
-        Merge strategy instead of empty.
-        :param value:
+        The rationale for using merge strategy is because a :py:class:`Sample`
+        will only be patched when it is cascading from policies.
+
+        This means:
+        - Specific policy's `default_sample` will be patched with default policy's `default_sample`;
+        - A request will be patched by the patched specific policy.
+
+        Example::
+            default_policy = {
+                "size": {
+                    "count": 1000
+                },
+                "spec": {
+                    "type": "random",
+                }
+            }
+            specific_policy = {
+                "size": {
+                    "percentage": 10.0
+                }
+            }
+            # The policy against which the request will be patched
+            # uses default's `spec` but specific's `size`
+            patched_specific_policy = {
+                "size": {
+                    "percentage": 10.0
+                },
+                "spec": {
+                    "type": "random"
+                }
+            }
+            # The user request
+            sample_request = {
+                "spec": {
+                    "type": "sorted",
+                    "spec": {
+                        "by": "my_column",
+                        "direction": "ASC"
+                    }
+                }
+            }
+            # The actual request to be processed
+            # uses request's `spec` but policy's `size`
+            patched_request = {
+                "size": {
+                    "percentage": 10.0
+                },
+                "spec": {
+                    "type": "sorted",
+                    "spec": {
+                        "by": "my_column",
+                        "direction": "ASC"
+                    }
+                }
+            }
+
         :return:
         """
-        sample_size = self.sample_size
-        sort_algorithm = self.sort_algorithm
-        if isinstance(value, Sample):
-            if sample_size is None:
-                sample_size = value.sample_size
-            if sort_algorithm is None:
-                sort_algorithm = value.sort_algorithm
-        return Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
+        return False
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)

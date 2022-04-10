@@ -60,23 +60,23 @@ class TestSampleSize:
 @pytest.mark.incremental
 class Test_SortProperties:
     @pytest.mark.parametrize(
-        'sort_by,sort_direction',
+        'by,direction',
         [
             ("column", sample.SortDirection.ASC.value),
             ("column", sample.SortDirection.DESC.value),
         ],
     )
-    def test_ctor_ok(self, sort_by: str, sort_direction: str):
+    def test_ctor_ok(self, by: str, direction: str):
         # Given/When
-        obj = sample._SortProperties(sort_by=sort_by, sort_direction=sort_direction)
+        obj = sample._SortProperties(by=by, direction=direction)
         # Then
-        assert obj.sort_by == sort_by
-        assert obj.sort_direction == sort_direction
+        assert obj.by == by
+        assert obj.direction == direction
         obj_dict = attrs.asdict(obj)
         assert obj == sample._SortProperties.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
-        'sort_by,sort_direction',
+        'by,direction',
         [
             (None, None),  # None is not str
             ("column", None),  # None is not str
@@ -85,22 +85,22 @@ class Test_SortProperties:
             ("column", sample.SortDirection.ASC),  # enum is not str
         ],
     )
-    def test_ctor_nok_type(self, sort_by: Any, sort_direction: Any):
+    def test_ctor_nok_type(self, by: Any, direction: Any):
         with pytest.raises(TypeError):
-            sample._SortProperties(sort_by=sort_by, sort_direction=sort_direction)
+            sample._SortProperties(by=by, direction=direction)
 
     @pytest.mark.parametrize(
-        'sort_by,sort_direction',
+        'by,direction',
         [
-            ("", sample.SortDirection.ASC.value),  # empty string as sort_by
-            (" column", sample.SortDirection.ASC.value),  # leading space in sort_by
-            ("column ", sample.SortDirection.ASC.value),  # trailing space in sort_by
-            ("column", sample.SortDirection.ASC.value + "_NOT"),  # invalid sort_direction
+            ("", sample.SortDirection.ASC.value),  # empty string as by
+            (" column", sample.SortDirection.ASC.value),  # leading space in by
+            ("column ", sample.SortDirection.ASC.value),  # trailing space in by
+            ("column", sample.SortDirection.ASC.value + "_NOT"),  # invalid direction
         ],
     )
-    def test_ctor_nok_value(self, sort_by: str, sort_direction: str):
+    def test_ctor_nok_value(self, by: str, direction: str):
         with pytest.raises(ValueError):
-            sample._SortProperties(sort_by=sort_by, sort_direction=sort_direction)
+            sample._SortProperties(by=by, direction=direction)
 
 
 @pytest.mark.incremental
@@ -112,10 +112,10 @@ class TestSortType:
         assert result in sample.SortType
 
 
-_TEST_SAMPLE_SIZE: sample.SampleSize = sample.SampleSize(count=31, percentage=57.986)
+_TEST_size: sample.SampleSize = sample.SampleSize(count=31, percentage=57.986)
 _TEST_COLUMN: str = "TEST_COLUMN"
 _TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
-    sort_by=_TEST_COLUMN, sort_direction=sample.SortDirection.ASC.value
+    by=_TEST_COLUMN, direction=sample.SortDirection.ASC.value
 )
 
 
@@ -126,8 +126,8 @@ class TestSortAlgorithm:
         [
             (None, None),
             (None, _TEST_SORT_PROPERTIES),
-            (sample.SortType.RELATIONAL.value, None),
-            (sample.SortType.RELATIONAL.value, _TEST_SORT_PROPERTIES),
+            (sample.SortType.SORTED.value, None),
+            (sample.SortType.SORTED.value, _TEST_SORT_PROPERTIES),
             (sample.SortType.RANDOM.value, _TEST_SORT_PROPERTIES),
         ],
     )
@@ -144,43 +144,41 @@ class TestSortAlgorithm:
                 sample.SortAlgorithm(type=t.value + "_NOT", properties=_TEST_SORT_PROPERTIES)
 
 
-_TEST_SORT_ALGORITHM: sample.SortAlgorithm = sample.SortAlgorithm(
-    type=sample.SortType.RELATIONAL.value, properties=_TEST_SORT_PROPERTIES
+_TEST_spec: sample.SortAlgorithm = sample.SortAlgorithm(
+    type=sample.SortType.SORTED.value, properties=_TEST_SORT_PROPERTIES
 )
-_TEST_SAMPLE: sample.Sample = sample.Sample(
-    sample_size=_TEST_SAMPLE_SIZE, sort_algorithm=_TEST_SORT_ALGORITHM
-)
+_TEST_SAMPLE: sample.Sample = sample.Sample(size=_TEST_size, spec=_TEST_spec)
 
 
 @pytest.mark.incremental
 class TestSample:
     @pytest.mark.parametrize(
-        'sample_size,sort_algorithm',
+        'size,spec',
         [
             (None, None),
-            (None, _TEST_SORT_ALGORITHM),
-            (_TEST_SAMPLE_SIZE, None),
-            (_TEST_SAMPLE_SIZE, _TEST_SORT_ALGORITHM),
+            (None, _TEST_spec),
+            (_TEST_size, None),
+            (_TEST_size, _TEST_spec),
         ],
     )
-    def test_ctor_ok(self, sample_size: sample.SampleSize, sort_algorithm: sample.SortAlgorithm):
-        obj = sample.Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
-        assert obj.sample_size == sample_size
-        assert obj.sort_algorithm == sort_algorithm
+    def test_ctor_ok(self, size: sample.SampleSize, spec: sample.SortAlgorithm):
+        obj = sample.Sample(size=size, spec=spec)
+        assert obj.size == size
+        assert obj.spec == spec
         obj_dict = attrs.asdict(obj)
         assert obj == sample.Sample.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
-        'sample_size,sort_algorithm',
+        'size,spec',
         [
-            (None, attrs.asdict(_TEST_SORT_ALGORITHM)),
-            (attrs.asdict(_TEST_SAMPLE_SIZE), None),
-            (attrs.asdict(_TEST_SAMPLE_SIZE), attrs.asdict(_TEST_SORT_ALGORITHM)),
+            (None, attrs.asdict(_TEST_spec)),
+            (attrs.asdict(_TEST_size), None),
+            (attrs.asdict(_TEST_size), attrs.asdict(_TEST_spec)),
         ],
     )
-    def test_ctor_nok_type(self, sample_size: Any, sort_algorithm: Any):
+    def test_ctor_nok_type(self, size: Any, spec: Any):
         with pytest.raises(TypeError):
-            sample.Sample(sample_size=sample_size, sort_algorithm=sort_algorithm)
+            sample.Sample(size=size, spec=spec)
 
 
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'

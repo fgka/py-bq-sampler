@@ -2,17 +2,15 @@
 """
 List all project IDs that should be sampled. It assumes the following structure in GCS bucket::
   /
-    sampling-policy.json - the generic and assumed always right JSON file
+    default_policy.json - the default and assumed always right JSON file
     <PROJECT_ID>/
       <DATASET_ID>/
         <TABLE_ID>.json - contains the specific policy for this specific
-                          table that overwrites the generic, if valid.
+                          table that overwrites the default, if valid.
 
 """
 import logging
-from typing import Any, Callable, Generator, Dict, Tuple
-
-import json
+from typing import Any, Callable, Generator, Tuple
 
 from bq_sampler import gcp_storage
 from bq_sampler.dto import policy
@@ -23,59 +21,57 @@ _JSON_EXT: str = ".json"
 
 
 def get_all_policies(
-    bucket_name: str, generic_policy_filename: str
+    bucket_name: str, default_policy_object_path: str
 ) -> Generator[policy.TablePolicy, None, None]:
     """
     The output is already containing the realized policies, i.e.,
-    merged with the generic policy, if needed.
+    merged with the default policy, if needed.
 
     :param bucket_name:
-    :param generic_policy_filename:
+    :param default_policy_object_path:
     :return:
     """
     logging.info(
-        'Retrieving all policies from bucket <%s> and using generic policy from <%s>',
+        'Retrieving all policies from bucket <%s> and using default policy from <%s>',
         bucket_name,
-        generic_policy_filename,
+        default_policy_object_path,
     )
-    # generic policy
-    generic_policy = _get_generic_policy(bucket_name, generic_policy_filename)
+    # default policy
+    default_policy = _get_default_policy(bucket_name, default_policy_object_path)
     # all policies
-    for table_policy in _retrieve_all_table_policies(bucket_name, generic_policy):
+    for table_policy in _retrieve_all_table_policies(bucket_name, default_policy):
         yield table_policy
 
 
-def _get_generic_policy(bucket_name: str, generic_policy_filename: str):
-    result = _get_overwritten_policy(
-        bucket_name, generic_policy_filename, policy.FALLBACK_GENERIC_POLICY
+def _get_default_policy(bucket_name: str, default_policy_object_path: str):
+    result = _get_overwritten_policy_from_gcs(
+        bucket_name, default_policy_object_path, policy.FALLBACK_GENERIC_POLICY
     )
     logging.info(
-        'Generic policy read from gs://%s/%s with: %s',
+        'Default policy read from gs://%s/%s with: %s',
         bucket_name,
-        generic_policy_filename,
+        default_policy_object_path,
         result,
     )
     return result
 
 
-def _get_overwritten_policy(
-    bucket_name: str, policy_filename: str, fallback_policy: policy.Policy
+def _get_overwritten_policy_from_gcs(
+    bucket_name: str, policy_object_path: str, fallback_policy: policy.Policy
 ) -> policy.Policy:
-    policy_dict: Dict[str, Any] = _fetch_gcs_object_as_dict(bucket_name, policy_filename)
-    result = policy.Policy.from_dict(policy_dict)
-    if result:
-        result = result.return_value_if_empty(fallback_policy)
+    policy_json_string: str = _fetch_gcs_object_as_string(bucket_name, policy_object_path)
+    result = _get_overwritten_policy(policy.Policy.from_json(policy_json_string), fallback_policy)
     return result
 
 
-def _fetch_gcs_object_as_dict(bucket_name: str, object_path: str) -> Dict[str, Any]:
+def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
     result = None
     try:
         content = gcp_storage.read_object(bucket_name, object_path)
-        result = json.loads(content.decode('utf-8'))
+        result = content.decode('utf-8')
     except Exception as err:  # pylint: disable=broad-except
         logging.warning(
-            'Could not load JSON content from <%s> in bucket <%s>. Ignoring. Error: %s',
+            'Could not load content as string from <%s> in bucket <%s>. Ignoring. Error: %s',
             object_path,
             bucket_name,
             err,
@@ -83,11 +79,24 @@ def _fetch_gcs_object_as_dict(bucket_name: str, object_path: str) -> Dict[str, A
     return result
 
 
+def _get_overwritten_policy(
+    specific_policy: policy.Policy, fallback_policy: policy.Policy
+) -> policy.Policy:
+    """
+    So CLI can use the exact same strategy.
+
+    :param specific_policy:
+    :param fallback_policy:
+    :return:
+    """
+    return specific_policy.patch_with(fallback_policy)
+
+
 def _retrieve_all_table_policies(
-    bucket_name: str, generic_policy: policy.Policy
+    bucket_name: str, default_policy: policy.Policy
 ) -> Generator[policy.TablePolicy, None, None]:
     def convert_fn(table_reference, obj_path) -> policy.TablePolicy:
-        actual_policy = _get_overwritten_policy(bucket_name, obj_path, generic_policy)
+        actual_policy = _get_overwritten_policy_from_gcs(bucket_name, obj_path, default_policy)
         result = policy.TablePolicy(table_reference=table_reference, policy=actual_policy)
         return result
 
@@ -144,9 +153,9 @@ def _retrieve_all_sample_requests(bucket_name: str) -> Generator[sample.TableSam
         yield request
 
 
-def _get_sample_request(bucket_name: str, request_filename: str) -> policy.Policy:
-    sample_dict: Dict[str, Any] = _fetch_gcs_object_as_dict(bucket_name, request_filename)
-    result = sample.Sample.from_dict(sample_dict)
+def _get_sample_request(bucket_name: str, request_filename: str) -> sample.Sample:
+    sample_json_string: str = _fetch_gcs_object_as_string(bucket_name, request_filename)
+    result = sample.Sample.from_json(sample_json_string)
     return result
 
 
@@ -164,11 +173,17 @@ def get_sample_request_from_policy(
     """
     # get overwritten request with policy default sample
     req_sample = _get_sample_request(bucket_name, _json_object_path(table_policy.table_reference))
-    harmonized_sample = req_sample.return_value_if_empty(table_policy.policy.default_sample)
+    effective_sample = _get_overwritten_request(req_sample, table_policy.policy)
     result = sample.TableSample(
-        table_reference=table_policy.table_reference, sample=harmonized_sample
+        table_reference=table_policy.table_reference, sample=effective_sample
     )
     return result
+
+
+def _get_overwritten_request(
+    request: sample.Sample, request_policy: policy.Policy
+) -> sample.Sample:
+    return request.patch_with(request_policy.default_sample)
 
 
 def _json_object_path(table_reference: sample.TableReference) -> str:

@@ -1,11 +1,11 @@
 {
   "__doc__": "It is a completely new default sample, but the sorting should not be overwritten by the general",
-  "sample_size_limit": {
+  "limit": {
     "count": 1200,
     "percentage": 41.1
   },
   "default_sample": {
-    "sample_size": {
+    "size": {
       "count": 11,
       "percentage": 7.5
     }

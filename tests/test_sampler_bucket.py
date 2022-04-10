@@ -13,18 +13,18 @@ from bq_sampler.dto import policy
 from tests import gcs_in_disk
 
 
-_GENERAL_POLICY_PATH: str = 'general_policy.json'
+_GENERAL_POLICY_PATH: str = 'default_policy.json'
 
 
-def test__fetch_gcs_object_as_dict_ok(monkeypatch):
+def test__fetch_gcs_object_as_json_string_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
-    result = sampler_bucket._fetch_gcs_object_as_dict(
+    result = sampler_bucket._fetch_gcs_object_as_string(
         gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
     )
     # Then
-    assert isinstance(result, dict)
+    assert isinstance(result, str)
 
 
 def _patch_gcs_storage(monkeypatch):
@@ -32,11 +32,11 @@ def _patch_gcs_storage(monkeypatch):
     monkeypatch.setattr(sampler_bucket.gcp_storage, '_list_blob_names', gcs_in_disk.list_blob_names)
 
 
-def test__get_generic_policy_ok(monkeypatch):
+def test__get_default_policy_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
-    result = sampler_bucket._get_generic_policy(gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
+    result = sampler_bucket._get_default_policy(gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
     # Then
     assert isinstance(result, policy.Policy)
     assert result is not policy.FALLBACK_GENERIC_POLICY
@@ -72,7 +72,7 @@ _MANDATORY_PRESENT_POLICIES: Set[str] = set(
 def test_get_all_policies_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
-    generic_policy = sampler_bucket._get_generic_policy(
+    default_policy = sampler_bucket._get_default_policy(
         gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
     )
     # When
@@ -82,35 +82,35 @@ def test_get_all_policies_ok(monkeypatch):
         tables.add(table_id)
         # Then
         if table_id in ('empty_policy', 'non_json'):
-            _is_same_as_generic(table_id, t_pol.policy, generic_policy, True, True)
+            _is_same_as_default(table_id, t_pol.policy, default_policy, True, True)
         elif table_id in ('policy_full', 'policy_full_again', 'policy_full_simple_default_sample'):
-            _is_same_as_generic(table_id, t_pol.policy, generic_policy, False, False)
+            _is_same_as_default(table_id, t_pol.policy, default_policy, False, False)
         elif table_id == 'policy_only_limit':
-            _is_same_as_generic(table_id, t_pol.policy, generic_policy, False, True)
+            _is_same_as_default(table_id, t_pol.policy, default_policy, False, True)
         else:
             assert False, f'Table id <{table_id}> has not assert specified'
     # Then: tests all mandatory
     assert _MANDATORY_PRESENT_POLICIES.issubset(tables)
 
 
-def _is_same_as_generic(
+def _is_same_as_default(
     table_id: str,
     table_policy: policy.Policy,
-    generic_policy: policy.Policy,
+    default_policy: policy.Policy,
     limit: bool = True,
     default_sample: bool = True,
 ):
-    is_limit = table_policy.sample_size_limit == generic_policy.sample_size_limit
-    is_default = table_policy.default_sample == generic_policy.default_sample
+    is_limit = table_policy.limit == default_policy.limit
+    is_default = table_policy.default_sample == default_policy.default_sample
     assert is_limit == limit, (
         f'Table <{table_id}>: Sample size should be equal = {limit}.'
-        f'\nPolicy:{table_policy.sample_size_limit}'
-        f'\nGeneric:{generic_policy.sample_size_limit}'
+        f'\nPolicy:{table_policy.limit}'
+        f'\nDefault:{default_policy.limit}'
     )
     assert is_default == default_sample, (
         f'Table <{table_id}>: Default Sample = {default_sample}.'
         f'\nPolicy:{table_policy.default_sample}'
-        f'\nGeneric:{generic_policy.default_sample}'
+        f'\nDefault:{default_policy.default_sample}'
     )
 
 
@@ -152,11 +152,11 @@ def test_get_all_sample_requests_ok(monkeypatch):
         assert t_req.sample is not None
         if table_id in _REQUEST_HAS_SAMPLE_SIZE:
             assert (
-                t_req.sample.sample_size is not None
+                t_req.sample.size is not None
             ), f'Table id <{table_id}> expected to have sample size, but does not.'
         if table_id in _REQUEST_HAS_SORT_ALGORITHM:
             assert (
-                t_req.sample.sort_algorithm is not None
+                t_req.sample.spec is not None
             ), f'Table id <{table_id}> expected to have sort algorithm, but does not.'
     # Then
     assert _MANDATORY_PRESENT_REQUESTS.issubset(tables)

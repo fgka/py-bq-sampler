@@ -5,7 +5,7 @@
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
 
-from typing import List
+from typing import Any, List
 
 import pytest
 
@@ -49,15 +49,20 @@ class TestHasIsEmpty:
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class _MyHasReturnArgumentIfEmpty(attrs_defaults.HasReturnArgumentIfEmpty):
+class _MyHasPatchWith_Substitution(attrs_defaults.HasPatchWith):
     field_int: int = attrs.field(default=None)
     field_str: str = attrs.field(default=None)
 
+    def patch_is_substitution(self) -> bool:
+        return True
 
-_TEST_MY_HAS_RETURN_ARGUMENT_IF_EMPTY = _MyHasReturnArgumentIfEmpty(field_int=11, field_str='TEST')
+
+_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION = _MyHasPatchWith_Substitution(
+    field_int=11, field_str='TEST_SUBSTITUTION'
+)
 
 
-class TestHasReturnArgumentIfEmpty:
+class TestHasPatchWith_Substitution:
     @pytest.mark.parametrize(
         'field_int,field_str',
         [
@@ -66,29 +71,110 @@ class TestHasReturnArgumentIfEmpty:
             (0, ''),
         ],
     )
-    def test_return_value_if_empty_ok_return_self(self, field_int: int, field_str: str):
+    def test_patch_with_ok_return_self(self, field_int: int, field_str: str):
         # Given
-        obj = _MyHasReturnArgumentIfEmpty(field_int=field_int, field_str=field_str)
+        obj = _MyHasPatchWith_Substitution(field_int=field_int, field_str=field_str)
         # When
-        result = obj.return_value_if_empty(_TEST_MY_HAS_RETURN_ARGUMENT_IF_EMPTY)
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION)
         # Then
         assert result == obj
 
-    def test_return_value_if_empty_ok_return_self_value_none(self):
+    def test_patch_with_ok_return_self_value_none(self):
         # Given
-        obj = _MyHasReturnArgumentIfEmpty()
+        obj = _MyHasPatchWith_Substitution()
         # When
-        result = obj.return_value_if_empty(None)
+        result = obj.patch_with(None)
         # Then
         assert result == obj
 
-    def test_return_value_if_empty_ok_return_value(self):
+    def test_patch_with_ok_return_value(self):
         # Given
-        obj = _MyHasReturnArgumentIfEmpty()
+        obj = _MyHasPatchWith_Substitution()
         # When
-        result = obj.return_value_if_empty(_TEST_MY_HAS_RETURN_ARGUMENT_IF_EMPTY)
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION)
         # Then
-        assert result == _TEST_MY_HAS_RETURN_ARGUMENT_IF_EMPTY
+        assert result == _TEST_MY_HAS_PATCH_WITH_SUBSTITUTION
+
+
+@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+class _MyHasPatchWith_Merge(attrs_defaults.HasPatchWith):
+    field_int: int = attrs.field(default=None)
+    field_with_patch: attrs_defaults.HasPatchWith = attrs.field(default=None)
+
+    def patch_is_substitution(self) -> bool:
+        return False
+
+
+_TEST_MY_HAS_PATCH_WITH_MERGE_A = _MyHasPatchWith_Merge(
+    field_int=13, field_with_patch=_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION
+)
+_TEST_MY_HAS_PATCH_WITH_MERGE_B = _MyHasPatchWith_Merge(
+    field_int=17, field_with_patch=_TEST_MY_HAS_PATCH_WITH_MERGE_A
+)
+
+
+class TestHasPatchWith_Merge:
+    def test_patch_with_ok_return_self(self):
+        # Given
+        obj = _MyHasPatchWith_Merge(
+            field_int=23, field_with_patch=_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION
+        )
+        # When
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_MERGE_B)
+        # Then
+        assert result == obj
+
+    def test_patch_with_ok_return_self_value_none(self):
+        # Given
+        obj = _MyHasPatchWith_Merge()
+        # When
+        result = obj.patch_with(None)
+        # Then
+        assert result == obj
+
+    def test_patch_with_ok_return_value(self):
+        # Given
+        obj = _MyHasPatchWith_Merge()
+        # When
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_MERGE_B)
+        # Then
+        assert result == _TEST_MY_HAS_PATCH_WITH_MERGE_B
+
+    def test_patch_with_ok_return_value_field_int(self):
+        # Given
+        obj = _MyHasPatchWith_Merge(field_with_patch=_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION)
+        # When
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_MERGE_B)
+        # Then
+        assert result.field_int == _TEST_MY_HAS_PATCH_WITH_MERGE_B.field_int
+        assert result.field_with_patch == obj.field_with_patch
+
+    def test_patch_with_ok_return_value_field_with_patch(self):
+        # Given
+        obj = _MyHasPatchWith_Merge(field_int=31)
+        # When
+        result = obj.patch_with(_TEST_MY_HAS_PATCH_WITH_MERGE_B)
+        # Then
+        assert result.field_int == obj.field_int
+        assert result.field_with_patch == _TEST_MY_HAS_PATCH_WITH_MERGE_B.field_with_patch
+
+    def test_patch_with_ok_recursion(self):
+        # Given
+        obj = _MyHasPatchWith_Merge(
+            field_with_patch=_MyHasPatchWith_Merge(
+                field_with_patch=_TEST_MY_HAS_PATCH_WITH_SUBSTITUTION
+            )
+        )
+        value = _MyHasPatchWith_Merge(
+            field_int=29, field_with_patch=_MyHasPatchWith_Merge(field_int=31)
+        )
+        # When
+        result = obj.patch_with(value)
+        # Then
+        assert result.field_int == value.field_int
+        # Then: recursion
+        assert result.field_with_patch.field_int == value.field_with_patch.field_int
+        assert result.field_with_patch.field_with_patch == obj.field_with_patch.field_with_patch
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
@@ -144,6 +230,46 @@ class TestHasFromDict:
         assert result == obj
         if field_a is not None:
             assert result.field_a == field_a
+
+
+@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+class _MyHasFromJsonStringA(attrs_defaults.HasFromJsonString):
+    field_str: str = attrs.field(default=None)
+    field_float: float = attrs.field(default=None)
+
+
+@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+class _MyHasFromJsonStringB(attrs_defaults.HasFromJsonString):
+    field_int: int = attrs.field(default=None)
+    field_a: _MyHasFromJsonStringA = attrs.field(default=None)
+
+
+class TestHasFromJsonString:
+    def test_from_json_ok_recursion(self):
+        # Given
+        obj = _MyHasFromJsonStringB(
+            field_int=17, field_a=_MyHasFromJsonStringA(field_str="TEST_JSON", field_float="1.1")
+        )
+        # When
+        result = _MyHasFromJsonStringB.from_json(obj.as_json())
+        # Then
+        assert result == obj
+
+    @pytest.mark.parametrize(
+        'json_string',
+        [
+            None,
+            "",
+            "{}",
+            "{field_int:17}",  # Field is missing quotation
+        ],
+    )
+    def test_from_json_ok_empty_object(self, json_string: Any):
+        # Given/When
+        obj = _MyHasFromJsonStringB.from_json(json_string)
+        # Then
+        assert isinstance(obj, _MyHasFromJsonStringB)
+        assert obj.is_empty()
 
 
 class _MyEnumWithFromStrIgnoreCase(attrs_defaults.EnumWithFromStrIgnoreCase):

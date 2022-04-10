@@ -8,6 +8,7 @@ Default values for creating an attributes class. To be used as::
     class MyAttrs: pass
 """
 import enum
+import json
 import logging
 from typing import Any, Dict
 
@@ -43,30 +44,107 @@ class HasIsEmpty:  # pylint: disable=too-few-public-methods
         return all([val is None for val in attrs.asdict(self).values()])
 
 
-class HasReturnArgumentIfEmpty(HasIsEmpty):
+class HasPatchWith(HasIsEmpty):
     """
     To add :py:meth:`return_value_if_empty` to children.
     """
 
-    def return_value_if_empty(self, value: Any) -> Any:
+    def patch_is_substitution(self) -> bool:  # pylint: disable=no-self-use
         """
-        If the current object is empty **AND** `value` is of the same class, return `value`.
+        Controls how :py:meth:`patch_with` works. If it is complete substitution or a merge.
+
+        :return:
+        """
+        return True
+
+    def patch_with(self, value: Any) -> Any:
+        """
+        The behavior depends on :py:meth:`patch_is_substitution`.
+        The argument `value` is only considered if it is of the same type as current instance.
+
+        If :py:meth:`patch_is_substitution` is :py:obj:`True` will return only return `value`
+        if the current instance is empty, i.e., :py:meth:`is_empty` returns :py:obj:`True`.
+
+        If :py:meth:`patch_is_substitution` is :py:obj:`False`,
+        will check each attribute individually and apply :py:meth:`patch_with` if applicable.
+
+        **NOTE**: It never changes the involved objects.
+        If the merge strategy is chosen, will create a new object with merge result.
+
         :param value:
         :return:
         """
         result = self
-        if self.is_empty() and isinstance(value, self.__class__):
-            result = value
+        if self.patch_is_substitution():
+            # substitution
+            if self.is_empty() and isinstance(value, self.__class__):
+                result = value
+        else:
+            # merge
+            if isinstance(value, self.__class__):
+                result = self._merge(value)
+        return result
+
+    def _merge(self, value: Any) -> Any:
+        try:
+            kwargs = self._create_merge_kwargs(value)
+        except Exception as err:  # pylint: disable=broad-except[
+            msg = (
+                f'Could not create merge kwargs. Current object: <{self}>. '
+                f'Value: <{value}>. '
+                f'Error: {err}'
+            )
+            logging.critical(msg)
+            raise ValueError(msg) from err
+        try:
+            result = self.__class__(**kwargs)
+        except Exception as err:  # pylint: disable=broad-except
+            msg = (
+                f'Could not instantiate <{self.__class__.__name__}> '
+                f'from kwargs <{kwargs}>. '
+                f'Error: {err}'
+            )
+            logging.critical(msg)
+            raise ValueError(msg) from err
+        return result
+
+    def _create_merge_kwargs(self, value: Any) -> Dict[str, Any]:
+        result = {}
+        for field in list(attrs.fields(self.__class__)):
+            self_field = getattr(self, field.name)
+            value_field = getattr(value, field.name)
+            result_field = self_field
+            if self_field is None:
+                # clear substitution
+                result_field = value_field
+            elif (
+                self_field is not None
+                and value_field is not None
+                and issubclass(field.type, HasPatchWith)
+            ):
+                # recursion on patch_with()
+                try:
+                    result_field = self_field.patch_with(value_field)
+                except Exception as err:  # pylint: disable=broad-except
+                    value_field = None
+                    logging.warning(
+                        'Could create field <%s> patching <%s> with <%s>. Ignoring. Error: %s',
+                        field.name,
+                        self_field,
+                        value_field,
+                        err,
+                    )
+            result[field.name] = result_field
         return result
 
 
-class HasFromDict(HasReturnArgumentIfEmpty):
+class HasFromDict(HasPatchWith):
     """
     To add :py:meth:`from_dict` to children.
     """
 
     @classmethod
-    def from_dict(cls, value: Dict[str, Any]) -> Any:  # pylint: disable=duplicate-code
+    def from_dict(cls, value: Dict[str, Any]) -> Any:
         """
         Converts a simple :py:class:`dict` into a instance of the current class.
 
@@ -114,6 +192,51 @@ class HasFromDict(HasReturnArgumentIfEmpty):
                         'Could create field <%s> from dict. Ignoring. Error: %s', field.name, err
                     )
             result[field.name] = field_value
+        return result
+
+
+class HasFromJsonString(HasFromDict):
+    """
+    To add :py:meth:`from_json` to children.
+    """
+
+    @classmethod
+    def from_json(cls, json_string: str) -> Any:
+        """
+        Will parse `json_string` and use :py:meth:`from_dict` to get the instance.
+
+        :param json_string:
+        :return:
+        """
+        value = {}
+        try:
+            value = json.loads(json_string)
+        except Exception as err:  # pylint: disable=broad-except
+            logging.warning(
+                'Could not parse JSON string <%s>. Ignoring. Error: %s', json_string, err
+            )
+        return cls.from_dict(value)
+
+    def as_json(self) -> str:
+        """
+        Converts the current object into a JSON string.
+
+        :return:
+        """
+        # first to dict
+        try:
+            value_dict = attrs.asdict(self)
+        except Exception as err:  # pylint: disable=broad-except
+            msg = f'Could not convert <{self}> to a dictionary. Error: {err}'
+            logging.critical(msg)
+            raise ValueError(msg) from err
+        # now to a JSON string from the dict
+        try:
+            result = json.dumps(value_dict)
+        except Exception as err:  # pylint: disable=broad-except
+            msg = f'Could not convert <{value_dict}>, from <{self}>, to a JSON string. Error: {err}'
+            logging.critical(msg)
+            raise ValueError(msg) from err
         return result
 
 

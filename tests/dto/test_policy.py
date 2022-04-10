@@ -18,20 +18,18 @@ from bq_sampler.dto import sample
 _TEST_SAMPLE_SIZE: sample.SampleSize = sample.SampleSize(count=17, percentage=11.1)
 _TEST_COLUMN: str = "TEST_COLUMN"
 _TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
-    sort_by=_TEST_COLUMN, sort_direction=sample.SortDirection.ASC.value
+    by=_TEST_COLUMN, direction=sample.SortDirection.ASC.value
 )
 _TEST_SORT_ALGORITHM: sample.SortAlgorithm = sample.SortAlgorithm(
-    type=sample.SortType.RELATIONAL.value, properties=_TEST_SORT_PROPERTIES
+    type=sample.SortType.SORTED.value, properties=_TEST_SORT_PROPERTIES
 )
-_TEST_SAMPLE: sample.Sample = sample.Sample(
-    sample_size=_TEST_SAMPLE_SIZE, sort_algorithm=_TEST_SORT_ALGORITHM
-)
+_TEST_SAMPLE: sample.Sample = sample.Sample(size=_TEST_SAMPLE_SIZE, spec=_TEST_SORT_ALGORITHM)
 
 
 @pytest.mark.incremental
 class TestPolicy:
     @pytest.mark.parametrize(
-        'sample_size_limit,default_sample',
+        'limit,default_sample',
         [
             (None, None),
             (_TEST_SAMPLE_SIZE, None),
@@ -39,24 +37,24 @@ class TestPolicy:
             (_TEST_SAMPLE_SIZE, _TEST_SAMPLE),
         ],
     )
-    def test_ctor_ok(self, sample_size_limit: sample.SampleSize, default_sample: sample.Sample):
-        obj = policy.Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
-        assert obj.sample_size_limit == sample_size_limit
+    def test_ctor_ok(self, limit: sample.SampleSize, default_sample: sample.Sample):
+        obj = policy.Policy(limit=limit, default_sample=default_sample)
+        assert obj.limit == limit
         assert obj.default_sample == default_sample
         obj_dict = attrs.asdict(obj)
         assert obj == policy.Policy.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
-        'sample_size_limit,default_sample',
+        'limit,default_sample',
         [
             (attrs.asdict(_TEST_SAMPLE_SIZE), None),
             (None, attrs.asdict(_TEST_SAMPLE)),
             (attrs.asdict(_TEST_SAMPLE_SIZE), attrs.asdict(_TEST_SAMPLE)),
         ],
     )
-    def test_ctor_nok_type(self, sample_size_limit: Any, default_sample: Any):
+    def test_ctor_nok_type(self, limit: Any, default_sample: Any):
         with pytest.raises(TypeError):
-            policy.Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
+            policy.Policy(limit=limit, default_sample=default_sample)
 
 
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
@@ -69,9 +67,7 @@ _TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
     table_id=_TEST_TABLE_ID,
     region=_TEST_REGION,
 )
-_TEST_POLICY: policy.Policy = policy.Policy(
-    sample_size_limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE
-)
+_TEST_POLICY: policy.Policy = policy.Policy(limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE)
 
 
 @pytest.mark.incremental

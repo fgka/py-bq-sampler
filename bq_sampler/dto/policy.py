@@ -2,7 +2,6 @@
 """
 DTO for the sample policy to be used to validate given sample request.
 """
-from typing import Any
 
 import attrs
 
@@ -11,31 +10,31 @@ from bq_sampler.dto import sample
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
-class Policy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class Policy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     Holds the DTO corresponding to a sample policy, as in::
         policy = {
-            "sample_size_limit": {
+            "limit": {
                 "count": 1000,
                 "percentage": 20.0
             },
             "default_sample": {
-                "sample_size": {
+                "size": {
                     "count": 123,
                     "percentage": 19.2
                 },
-                "sort_algorithm": {
-                    "type": "relational",
+                "spec": {
+                    "type": "sorted",
                     "properties": {
-                        "sort_by": "my_column",
-                        "sort_direction": "DESC"
+                        "by": "my_column",
+                        "direction": "DESC"
                     }
                 }
             }
         }
     """
 
-    sample_size_limit: sample.SampleSize = attrs.field(
+    limit: sample.SampleSize = attrs.field(
         default=None,
         validator=attrs.validators.optional(
             validator=attrs.validators.instance_of(sample.SampleSize)
@@ -46,27 +45,72 @@ class Policy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-meth
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(sample.Sample)),
     )
 
-    def return_value_if_empty(self, value: Any) -> Any:
+    def patch_is_substitution(self) -> bool:
         """
-        Merge strategy instead of empty.
-        :param value:
+        The rationale for using merge strategy is because a :py:class:`Policy`
+        will only be patched against the default policy.
+
+        Example::
+            default_policy = {
+                "limit": {
+                    "count": 1000,
+                    "percentage": 20.0
+                },
+                "default_sample": {
+                    "size": {
+                        "count": 10,
+                        "percentage": 10.0
+                    },
+                    "spec": {
+                        "type": "sorted",
+                        "properties": {
+                            "by": "my_column",
+                            "direction": "DESC"
+                        }
+                    }
+                }
+            }
+            specific_policy = {
+                "default_sample": {
+                    "size": {
+                        "count": 123,
+                        "percentage": 19.2
+                    }
+                }
+            }
+            # The policy against which the request will be patched
+            # uses default's `limit` from default and also `default_sample.spec`.
+            # The specific policy only defines the `default_sample.size`.
+            patched_specific_policy = {
+                "limit": {
+                    "count": 1000,
+                    "percentage": 20.0
+                },
+                "default_sample": {
+                    "size": {
+                        "count": 123,
+                        "percentage": 19.2
+                    },
+                    "spec": {
+                        "type": "sorted",
+                        "properties": {
+                            "by": "my_column",
+                            "direction": "DESC"
+                        }
+                    }
+                }
+            }
+
         :return:
         """
-        sample_size_limit = self.sample_size_limit
-        default_sample = self.default_sample
-        if isinstance(value, Policy):
-            if sample_size_limit is None:
-                sample_size_limit = value.sample_size_limit
-            if default_sample is None:
-                default_sample = value.default_sample
-        return Policy(sample_size_limit=sample_size_limit, default_sample=default_sample)
+        return False
 
 
 FALLBACK_GENERIC_POLICY: Policy = Policy(
-    sample_size_limit=sample.SampleSize(count=1),
+    limit=sample.SampleSize(count=1),
     default_sample=sample.Sample(
-        sample_size=sample.SampleSize(count=1),
-        sort_algorithm=sample.SortAlgorithm(type=sample.SortType.RANDOM.value),
+        size=sample.SampleSize(count=1),
+        spec=sample.SortAlgorithm(type=sample.SortType.default().value),
     ),
 )
 """
