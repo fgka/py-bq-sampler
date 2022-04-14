@@ -12,11 +12,12 @@ List all project IDs that should be sampled. It assumes the following structure 
 import logging
 from typing import Any, Callable, Generator, Tuple
 
-from bq_sampler import gcp_storage
+from bq_sampler.gcp import storage
 from bq_sampler.dto import policy
 from bq_sampler.dto import sample
 
 
+_LOGGER = logging.getLogger(__name__)
 _JSON_EXT: str = ".json"
 
 
@@ -67,7 +68,7 @@ def _get_overwritten_policy_from_gcs(
 def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
     result = None
     try:
-        content = gcp_storage.read_object(bucket_name, object_path)
+        content = storage.read_object(bucket_name, object_path)
         result = content.decode('utf-8')
     except Exception as err:  # pylint: disable=broad-except
         logging.warning(
@@ -118,7 +119,7 @@ def _list_all_table_references_obj_path(
     def filter_fn(value: str) -> bool:
         return value.endswith(_JSON_EXT) and len(value.split('/')) == 3
 
-    for obj_path in gcp_storage.list_objects(bucket_name, filter_fn):
+    for obj_path in storage.list_objects(bucket_name, filter_fn):
         project_id, dataset_id, table_id_file = obj_path.split('/')
         table_id = table_id_file[: -len(_JSON_EXT)]
         table_reference = sample.TableReference(

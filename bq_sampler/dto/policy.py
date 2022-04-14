@@ -2,7 +2,6 @@
 """
 DTO for the sample policy to be used to validate given sample request.
 """
-
 import attrs
 
 from bq_sampler.dto import attrs_defaults

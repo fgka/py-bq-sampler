@@ -14,6 +14,9 @@ import cachetools
 from google.cloud import storage
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class CloudStorageDownloadError(Exception):
     """To code all GCS download errors"""
 
@@ -38,14 +41,14 @@ def read_object(bucket_name: str, path: str) -> bytes:
     bucket_name = bucket_name.strip('/')
     # logic
     gcs_uri = f'gs://{bucket_name}/{path}'
-    logging.info('Reading <%s>', gcs_uri)
+    _LOGGER.info('Reading <%s>', gcs_uri)
     try:
         bucket = _bucket(bucket_name)
         blob = bucket.get_blob(path)
         result = blob.download_as_bytes()
     except Exception as err:
         msg = f'Could not download content from <{gcs_uri}>. Error: {err}'
-        logging.critical(msg)
+        _LOGGER.critical(msg)
         raise CloudStorageDownloadError(msg) from err
     return result
 
@@ -118,7 +121,7 @@ def list_objects(
                 f'Could not add blob named <{obj_path}> from bucket <{bucket_name}>. '
                 f'Stopping list now. Error: <{err}>'
             )
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise CloudStorageListError(msg) from err
 
 

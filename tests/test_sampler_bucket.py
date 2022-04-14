@@ -7,10 +7,10 @@
 
 from typing import Set
 
-from bq_sampler import sampler_bucket
 from bq_sampler.dto import policy
+from bq_sampler import sampler_bucket
 
-from tests import gcs_in_disk
+from tests import gcs_on_disk
 
 
 _GENERAL_POLICY_PATH: str = 'default_policy.json'
@@ -21,22 +21,22 @@ def test__fetch_gcs_object_as_json_string_ok(monkeypatch):
     _patch_gcs_storage(monkeypatch)
     # When
     result = sampler_bucket._fetch_gcs_object_as_string(
-        gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
+        gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
     )
     # Then
     assert isinstance(result, str)
 
 
 def _patch_gcs_storage(monkeypatch):
-    monkeypatch.setattr(sampler_bucket.gcp_storage, 'read_object', gcs_in_disk.read_object)
-    monkeypatch.setattr(sampler_bucket.gcp_storage, '_list_blob_names', gcs_in_disk.list_blob_names)
+    monkeypatch.setattr(sampler_bucket.storage, 'read_object', gcs_on_disk.read_object)
+    monkeypatch.setattr(sampler_bucket.storage, '_list_blob_names', gcs_on_disk.list_blob_names)
 
 
 def test__get_default_policy_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
-    result = sampler_bucket._get_default_policy(gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
+    result = sampler_bucket._get_default_policy(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
     # Then
     assert isinstance(result, policy.Policy)
     assert result is not policy.FALLBACK_GENERIC_POLICY
@@ -46,7 +46,7 @@ def test__list_all_table_references_obj_path_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
-    result = list(sampler_bucket._list_all_table_references_obj_path(gcs_in_disk.POLICY_BUCKET))
+    result = list(sampler_bucket._list_all_table_references_obj_path(gcs_on_disk.POLICY_BUCKET))
     # Then
     assert len(result) > 1
     for table_ref, obj_path in result:
@@ -73,11 +73,11 @@ def test_get_all_policies_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     default_policy = sampler_bucket._get_default_policy(
-        gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
+        gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
     )
     # When
     tables = set()
-    for t_pol in sampler_bucket.get_all_policies(gcs_in_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH):
+    for t_pol in sampler_bucket.get_all_policies(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH):
         table_id = t_pol.table_reference.table_id
         tables.add(table_id)
         # Then
@@ -145,7 +145,7 @@ def test_get_all_sample_requests_ok(monkeypatch):
     _patch_gcs_storage(monkeypatch)
     # When
     tables = set()
-    for t_req in sampler_bucket.get_all_sample_requests(gcs_in_disk.REQUEST_BUCKET):
+    for t_req in sampler_bucket.get_all_sample_requests(gcs_on_disk.REQUEST_BUCKET):
         table_id = t_req.table_reference.table_id
         tables.add(table_id)
         # Then

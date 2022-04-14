@@ -14,6 +14,10 @@ from typing import Any, Dict
 
 import attrs
 
+
+_LOGGER = logging.getLogger(__name__)
+
+
 ATTRS_DEFAULTS: Dict[str, Any] = dict(
     kw_only=True,
     str=True,
@@ -94,7 +98,7 @@ class HasPatchWith(HasIsEmpty):
                 f'Value: <{value}>. '
                 f'Error: {err}'
             )
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise ValueError(msg) from err
         try:
             result = self.__class__(**kwargs)
@@ -104,7 +108,7 @@ class HasPatchWith(HasIsEmpty):
                 f'from kwargs <{kwargs}>. '
                 f'Error: {err}'
             )
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise ValueError(msg) from err
         return result
 
@@ -127,7 +131,7 @@ class HasPatchWith(HasIsEmpty):
                     result_field = self_field.patch_with(value_field)
                 except Exception as err:  # pylint: disable=broad-except
                     value_field = None
-                    logging.warning(
+                    _LOGGER.warning(
                         'Could create field <%s> patching <%s> with <%s>. Ignoring. Error: %s',
                         field.name,
                         self_field,
@@ -156,14 +160,14 @@ class HasFromDict(HasPatchWith):
             try:
                 kwargs = cls._create_kwargs(value)
             except Exception as err:  # pylint: disable=broad-except
-                logging.warning(
+                _LOGGER.warning(
                     'Could not parse %s from dictionary <%s>. Error: %s', cls.__name__, value, err
                 )
         try:
             result = cls(**kwargs)
         except Exception as err:  # pylint: disable=broad-except
             msg = f'Could not instantiate <{cls.__name__}> from kwargs <{kwargs}>. Error: {err}'
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise ValueError(msg) from err
         return result
 
@@ -188,7 +192,7 @@ class HasFromDict(HasPatchWith):
                     field_value = field.type.from_dict(field_value)
                 except Exception as err:  # pylint: disable=broad-except
                     field_value = None
-                    logging.warning(
+                    _LOGGER.warning(
                         'Could create field <%s> from dict. Ignoring. Error: %s', field.name, err
                     )
             result[field.name] = field_value
@@ -212,7 +216,7 @@ class HasFromJsonString(HasFromDict):
         try:
             value = json.loads(json_string)
         except Exception as err:  # pylint: disable=broad-except
-            logging.warning(
+            _LOGGER.warning(
                 'Could not parse JSON string <%s>. Ignoring. Error: %s', json_string, err
             )
         return cls.from_dict(value)
@@ -228,14 +232,14 @@ class HasFromJsonString(HasFromDict):
             value_dict = attrs.asdict(self)
         except Exception as err:  # pylint: disable=broad-except
             msg = f'Could not convert <{self}> to a dictionary. Error: {err}'
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise ValueError(msg) from err
         # now to a JSON string from the dict
         try:
             result = json.dumps(value_dict)
         except Exception as err:  # pylint: disable=broad-except
             msg = f'Could not convert <{value_dict}>, from <{self}>, to a JSON string. Error: {err}'
-            logging.critical(msg)
+            _LOGGER.critical(msg)
             raise ValueError(msg) from err
         return result
 
