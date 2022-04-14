@@ -232,6 +232,15 @@ class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pub
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(str)),
     )
 
+    def get_table_fqn(self) -> str:
+        """
+        Returns the full-qualified table ID for BigQuery.
+        Same as::
+            '.'.join([project_id, dataset_id, table_id])
+        :return:
+        """
+        return '.'.join((val.strip() for val in [self.project_id, self.dataset_id, self.table_id]))
+
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
 class TableSample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods

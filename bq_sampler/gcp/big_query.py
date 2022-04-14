@@ -151,21 +151,22 @@ def drop_all_tables_by_tag(project_id: str, tag: str) -> None:
     # TODO
 
 
-def create_table_with_data(
-    table_fqn_id: str, row_iterator: bigquery.table.RowIterator, tag: Optional[str] = None
-) -> None:
+def create_table(table_fqn_id: str, tag: Optional[str] = None) -> None:
     """
 
     :param table_fqn_id:
-    :param row_iterator:
     :param tag:
     :return:
     """
+    # validate input
     table_fqn_id = _get_stripped_str_arg('table_fqn_id', table_fqn_id)
-    if not isinstance(row_iterator, bigquery.table.RowIterator):
-        raise ValueError(
-            f'Argument row_iterator for table {table_fqn_id} '
-            f'must be of type {bigquery.table.RowIterator.__name__}. '
-            f'But got: <{type(row_iterator)}>'
-        )
-    # TODO
+    tag = _validate_table_tag(tag)
+    # logic
+
+
+def _validate_table_tag(table_tag: str) -> str:
+    if not isinstance(table_tag, str) or not table_tag.strip():
+        table_tag = DEFAULT_CREATE_TABLE_TAG
+    else:
+        table_tag = table_tag.strip()
+    return table_tag
