@@ -28,7 +28,7 @@ _BQ_ROW_AMOUNT_INT_PARAM: str = 'row_amount_int'
 _BQ_SOURCE_TABLE_PARAM: str = 'source_table'
 _BQ_ORDER_BY_COLUMN: str = 'column_name'
 _BQ_ORDER_BY_DIRECTION: str = 'direction'
-_BQ_TARGET_TABLE_PARAM: str = 'source_table'
+_BQ_TARGET_TABLE_PARAM: str = 'target_table'
 
 _BQ_RANDOM_SAMPLE_QUERY_TMPL: str = f"""
     SELECT * FROM `%({_BQ_SOURCE_TABLE_PARAM})s`
@@ -120,7 +120,7 @@ def _validate_table_reference(arg_name: str, table_ref: sample.TableReference) -
         raise ValueError(
             f'Table reference for {arg_name} must be '
             f'an instance of {sample.TableReference.__name__}. '
-            f'Got: {type(table_ref)}'
+            f'Got: <{table_ref}>{type(table_ref)}'
         )
 
 
@@ -160,8 +160,8 @@ def _get_named_placeholders(  # pylint: disable=too-many-arguments
     target_table_fqn_id: Optional[str] = None,
     amount: Optional[int] = None,
     percent_int: Optional[int] = None,
-    column: Optional[str],
-    order: Optional[str],
+    column: Optional[str] = None,
+    order: Optional[str] = None,
 ) -> Dict[str, Any]:
     result = {}
     if source_table_fqn_id is not None:
@@ -241,14 +241,17 @@ def create_table_with_random_sample(
     source_table_ref: sample.TableReference,
     target_table_ref: sample.TableReference,
     amount: int,
-    table_tag: Optional[str] = None,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
 ) -> None:
     """
 
     :param source_table_ref:
     :param target_table_ref:
     :param amount:
-    :param table_tag:
+    :param labels:
+    :param recreate_table: if :py:obj:`True` (default) will drop the table prior to create it.
+        If the table does not exist, it will ignore the drop.
     :return:
     """
     # validate input
@@ -257,15 +260,23 @@ def create_table_with_random_sample(
     _validate_table_reference('target_table_ref', target_table_ref)
     # logic
     _create_table_with_random_sample(
-        source_table_ref.get_table_fqn(), target_table_ref.get_table_fqn(), amount, table_tag
+        source_table_ref.get_table_fqn(),
+        target_table_ref.get_table_fqn(),
+        amount,
+        labels,
+        recreate_table,
     )
 
 
 def _create_table_with_random_sample(
-    source_table_fqn_id: str, target_table_fqn_id: str, amount: int, table_tag: Optional[str] = None
+    source_table_fqn_id: str,
+    target_table_fqn_id: str,
+    amount: int,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
 ) -> None:
     # create table
-    big_query.create_table(target_table_fqn_id, table_tag)
+    _create_table(source_table_fqn_id, target_table_fqn_id, labels, recreate_table)
     # insert data
     percent_int = _get_int_percent(source_table_fqn_id, amount)
     query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
@@ -277,6 +288,16 @@ def _create_table_with_random_sample(
     big_query.query_job_result(_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders)
 
 
+def _create_table(
+    source_table_fqn_id: str,
+    target_table_fqn_id: str,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
+) -> None:
+    src_table = big_query.get_table(source_table_fqn_id)
+    big_query.create_table(target_table_fqn_id, src_table.schema, labels, recreate_table)
+
+
 def create_table_with_sorted_sample(
     *,
     source_table_ref: sample.TableReference,
@@ -284,7 +305,8 @@ def create_table_with_sorted_sample(
     amount: int,
     column: str,
     order: str,
-    table_tag: Optional[str] = None,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
 ) -> None:
     """
 
@@ -293,7 +315,8 @@ def create_table_with_sorted_sample(
     :param amount:
     :param column:
     :param order:
-    :param table_tag:
+    :param labels:
+    :param recreate_table:
     :return:
     """
     # validate input
@@ -307,7 +330,8 @@ def create_table_with_sorted_sample(
         amount,
         column,
         order,
-        table_tag,
+        labels,
+        recreate_table,
     )
 
 
@@ -317,10 +341,11 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     amount: int,
     column: str,
     order: str,
-    table_tag: Optional[str] = None,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
 ) -> None:
     # create table
-    big_query.create_table(target_table_fqn_id, table_tag)
+    _create_table(source_table_fqn_id, target_table_fqn_id, labels, recreate_table)
     # insert data
     query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
         source_table_fqn_id=source_table_fqn_id,

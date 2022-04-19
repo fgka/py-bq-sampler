@@ -218,6 +218,9 @@ class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
         return False
 
 
+_BQ_ID_SEP: str = '.'
+
+
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
 class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
@@ -239,7 +242,29 @@ class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pub
             '.'.join([project_id, dataset_id, table_id])
         :return:
         """
-        return '.'.join((val.strip() for val in [self.project_id, self.dataset_id, self.table_id]))
+        return _BQ_ID_SEP.join(
+            (val.strip() for val in [self.project_id, self.dataset_id, self.table_id])
+        )
+
+    @classmethod
+    def from_str(cls, value: str) -> Any:
+        """
+        Creates a new instance of :py:class:`TableReference`
+            based on the fully-qualified table name.
+        Format: `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>`
+
+        :param value:
+        :return:
+        """
+        if not isinstance(value, str):
+            raise ValueError(f'Argument must be a {str.__name__}. Got: <{value}>({type(value)})')
+        project_id, dataset_id, table_id = (v.strip() for v in value.split(_BQ_ID_SEP))
+        if not project_id or not dataset_id or not table_id:
+            raise ValueError(
+                f'Argument must be in the format: <PROJECT_ID>.<DATASET_ID>.<TABLE_ID>. '
+                f'Got: {value}'
+            )
+        return cls(project_id=project_id, dataset_id=dataset_id, table_id=table_id)
 
 
 @attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
