@@ -4,11 +4,12 @@ DTO for the sample policy to be used to validate given sample request.
 """
 import attrs
 
+from bq_sampler import const
 from bq_sampler.dto import attrs_defaults
 from bq_sampler.dto import sample
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class Policy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     Holds the DTO corresponding to a sample policy, as in::
@@ -117,7 +118,7 @@ To be used as the absolute minimum default policy.
 """
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class TablePolicy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the policy

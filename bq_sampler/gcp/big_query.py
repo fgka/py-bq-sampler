@@ -8,48 +8,84 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 """
 # pylint: enable=line-too-long
 import logging
-from typing import Any, Dict, Generator, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Mapping, Optional, Sequence, Tuple, Union
 
 import cachetools
 
 from google.cloud import bigquery
 from google.api_core import page_iterator
 
+from bq_sampler import const
+
 
 _LOGGER = logging.getLogger(__name__)
 
-_BQ_ID_SEP: str = '.'
 
-DEFAULT_CREATE_TABLE_LABELS: Dict[str, str] = {
-    'sample_table': 'true',
-}
-"""
-Default GCP resource label to be applied table created here.
-"""
+class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
+    def __init__(self, table_fqn_id: str):
+        self.table_fqn_id = _get_stripped_str_arg('table_fqn_id', table_fqn_id)
+        (
+            self.project_id,
+            self.dataset_id,
+            self.table_id,
+            self.location,
+        ) = self._break_down_table_fqn_id(table_fqn_id)
+        self.table_id_only = const.BQ_TABLE_FQN_ID_SEP.join(
+            [self.project_id, self.dataset_id, self.table_id]
+        )
 
+    _BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL: str = 'Table FQN ID does not contain a {}. Got: <{}>'
 
-@cachetools.cached(cache=cachetools.LRUCache(maxsize=100_000))
-def get_table_row_count(table_fqn_id: str, location: Optional[str] = None) -> int:
-    """
-    Compute table size (in rows) for the argument.
+    @staticmethod
+    def _break_down_table_fqn_id(table_fqn_id: str) -> Tuple[str, str, str]:
+        location = None
+        table_only_id = table_fqn_id
+        if const.BQ_TABLE_FQN_LOCATION_SEP in table_fqn_id:
+            try:
+                table_only_id, location = (
+                    v.strip() for v in table_fqn_id.split(const.BQ_TABLE_FQN_LOCATION_SEP)
+                )
+            except Exception as err:
+                raise ValueError(
+                    _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
+                        'enough tokens', table_fqn_id
+                    )
+                ) from err
+        try:
+            project_id, dataset_id, table_id = (
+                v.strip() for v in table_only_id.split(const.BQ_TABLE_FQN_ID_SEP)
+            )
+        except Exception as err:
+            raise ValueError(
+                _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
+                    'enough tokens', table_fqn_id
+                )
+            ) from err
+        if not project_id:
+            raise ValueError(
+                _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
+                    'project ID', table_fqn_id
+                )
+            )
+        if not dataset_id:
+            raise ValueError(
+                _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
+                    'dataset ID', table_fqn_id
+                )
+            )
+        if not table_id:
+            raise ValueError(
+                _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
+                    'table ID', table_fqn_id
+                )
+            )
+        return project_id, dataset_id, table_id, location
 
-    **NOTE**: This call is cached,
-        since it is assumed that during a session the row count
-        will not dramatically change.
-
-    :param table_fqn_id: in the format <PROJECT_ID>.<DATASET_ID>.<TABLE_ID>
-    :param location:
-    :return:
-    """
-    return _get_table_size(
-        _validate_table_fqn_id(table_fqn_id), _get_stripped_str_arg('location', location, True)
-    )
-
-
-def _validate_table_fqn_id(value: str) -> str:
-    result = _get_stripped_str_arg('table_fqn_id', value)
-    _break_down_table_fqn_id(result)
-    return result
+    def __str__(self) -> str:
+        result = self.table_id_only
+        if self.location:
+            result = f'{result}{const.BQ_TABLE_FQN_LOCATION_SEP}{self.location}'
+        return result
 
 
 def _get_stripped_str_arg(name: str, value: str, accept_none: Optional[bool] = False) -> str:
@@ -62,37 +98,26 @@ def _get_stripped_str_arg(name: str, value: str, accept_none: Optional[bool] = F
     return result
 
 
-_BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL: str = 'Table FQN ID does not contain a {}. Got: <{}>'
+def get_table(*, table_fqn_id: str) -> bigquery.Table:
+    """
+    Query table information and returns an initialized instance of :py:class:`bigquery.Table`.
+
+    :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
+    :return:
+    """
+    # validate input
+    table_spec = _SimpleTableSpec(table_fqn_id)
+    # logic
+    return _get_table(table_spec)
 
 
-def _break_down_table_fqn_id(table_fqn_id: str) -> Tuple[str, str, str]:
+def _get_table(table_spec: _SimpleTableSpec) -> bigquery.table.Table:
     try:
-        project_id, dataset_id, table_id = (v.strip() for v in table_fqn_id.split('.'))
-    except Exception as err:
-        raise ValueError(
-            _BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format('enough tokens', table_fqn_id)
-        ) from err
-    if not project_id:
-        raise ValueError(_BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format('project ID', table_fqn_id))
-    if not dataset_id:
-        raise ValueError(_BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format('dataset ID', table_fqn_id))
-    if not table_id:
-        raise ValueError(_BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format('table ID', table_fqn_id))
-    return project_id, dataset_id, table_id
-
-
-def _get_table_size(table_fqn_id: str, location: Optional[str] = None) -> int:
-    _LOGGER.info('Reading table size from :<%s>', table_fqn_id)
-    table = _get_table(table_fqn_id, location)
-    return table.num_rows
-
-
-def _get_table(table_fqn_id: str, location: Optional[str] = None) -> bigquery.table.Table:
-    project_id, _, _ = _break_down_table_fqn_id(table_fqn_id)
-    try:
-        result = _client(project_id, location).get_table(table_fqn_id)
+        result = _client(table_spec.project_id, table_spec.location).get_table(
+            table_spec.table_id_only
+        )
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not retrieve table object for <{table_fqn_id}>. Error: {err}'
+        msg = f'Could not retrieve table object for <{table_spec}>. Error: {err}'
         _LOGGER.critical(msg)
         raise ValueError(msg) from err
     return result
@@ -106,29 +131,8 @@ def _client(project_id: Optional[str] = None, location: Optional[str] = None) ->
     return bigquery.Client(project=project_id, location=location)
 
 
-def query_job_result(
-    query: str,
-    job_config: Optional[bigquery.QueryJobConfig] = None,
-    project_id: Optional[str] = None,
-    location: Optional[str] = None,
-) -> bigquery.table.RowIterator:
-    """
-
-    :param query:
-    :param job_config:
-    :return:
-    """
-    job = query_job(query, job_config, project_id, location)
-    try:
-        result = job.result()
-    except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not retrieve results from query <{_query_job_to_log_str(job)}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
-    return result
-
-
 def query_job(
+    *,
     query: str,
     job_config: Optional[bigquery.QueryJobConfig] = None,
     project_id: Optional[str] = None,
@@ -139,15 +143,36 @@ def query_job(
 
     :param query:
     :param job_config:
+    :param location:
+    :param project_id:
     :return:
 
     .. docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
     """
+    # validate input
     query = _get_stripped_str_arg('query', query)
-    query_parameters = job_config.query_parameters if job_config else None
-    _LOGGER.info('Issuing BigQuery query: <%s> with job_config: <%s>', query, query_parameters)
     project_id = _get_stripped_str_arg('project_id', project_id, True)
     location = _get_stripped_str_arg('location', location, True)
+    # logic
+    result = _query_job(query, job_config, project_id, location)
+    _LOGGER.info(
+        'Query <%s> stats: total bytes processed %s; total bytes billed %s; slot milliseconds: %s.',
+        _query_job_to_log_str(result),
+        result.total_bytes_processed,
+        result.total_bytes_billed,
+        result.slot_millis,
+    )
+    return result
+
+
+def _query_job(
+    query: str,
+    job_config: Optional[bigquery.QueryJobConfig] = None,
+    project_id: Optional[str] = None,
+    location: Optional[str] = None,
+) -> bigquery.job.query.QueryJob:
+    query_parameters = job_config.query_parameters if job_config else None
+    _LOGGER.info('Issuing BigQuery query: <%s> with job_config: <%s>', query, query_parameters)
     try:
         result = _client(project_id, location).query(query, job_config=job_config)
     except Exception as err:  # pylint: disable=broad-except
@@ -158,13 +183,6 @@ def query_job(
         )
         _LOGGER.critical(msg)
         raise RuntimeError(msg) from err
-    _LOGGER.info(
-        'Query <%s> stats: total bytes processed %s; total bytes billed %s; slot milliseconds: %s.',
-        _query_job_to_log_str(result),
-        result.total_bytes_processed,
-        result.total_bytes_billed,
-        result.slot_millis,
-    )
     return result
 
 
@@ -177,49 +195,36 @@ def _query_job_to_log_str(query_job_: bigquery.job.query.QueryJob) -> str:
     return query_job_.query.replace('\n', '').strip() + f' -> {query_job_.query_parameters}'
 
 
-def get_table(table_fqn_id: str, location: Optional[str] = None) -> bigquery.Table:
-    """
-
-    :param table_fqn_id:
-    :return:
-    """
-    # validate input
-    table_fqn_id = _validate_table_fqn_id(table_fqn_id)
-    # logic
-    return _get_table(table_fqn_id, location)
-
-
 def create_table(
+    *,
     table_fqn_id: str,
     schema: Sequence[Union[bigquery.schema.SchemaField, Mapping[str, Any]]],
     labels: Optional[Dict[str, str]] = None,
     drop_table_before: Optional[bool] = True,
-    location: Optional[str] = None,
 ) -> None:
     """
 
-    :param table_fqn_id:
+    :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :param schema:
     :param labels:
     :param drop_table_before:
-    :param region:
     :return:
     """
     # validate input
-    table_fqn_id = _validate_table_fqn_id(table_fqn_id)
+    table_spec = _SimpleTableSpec(table_fqn_id)
     labels = _validate_table_labels(labels)
+    _validate_schema(schema)
     # logic
     _LOGGER.info('Creating table <%s> with labels: <%s>', table_fqn_id, labels)
-    project_id, dataset_id, table_id = _break_down_table_fqn_id(table_fqn_id)
-    dataset = _create_dataset(project_id, dataset_id, labels, location)
+    dataset = _create_dataset(table_spec, labels)
     if drop_table_before:
-        drop_table(table_fqn_id)
-    _create_table(dataset, table_id, schema, labels, location)
+        drop_table(table_fqn_id=table_fqn_id)
+    _create_table(dataset, table_spec, schema, labels)
 
 
 def _validate_table_labels(labels: Optional[Dict[str, str]] = None) -> str:
     if not isinstance(labels, dict):
-        labels = DEFAULT_CREATE_TABLE_LABELS
+        labels = const.DEFAULT_CREATE_TABLE_LABELS
     return labels
 
 
@@ -231,28 +236,34 @@ def _validate_schema(
 
 
 def _create_dataset(
-    project_id: str,
-    dataset_id: str,
+    table_spec: _SimpleTableSpec,
     labels: Dict[str, str],
     exists_ok: Optional[bool] = True,
-    location: Optional[str] = None,
 ) -> bigquery.Dataset:
-    _LOGGER.info('Creating dataset <%s.%s> with labels: <%s>', project_id, dataset_id, labels)
+    _LOGGER.info(
+        'Creating dataset <%s.%s> with labels: <%s>',
+        table_spec.project_id,
+        table_spec.dataset_id,
+        labels,
+    )
     # Dataset obj
     try:
-        result = bigquery.Dataset(_BQ_ID_SEP.join([project_id, dataset_id]))
-        result.labels = labels
+        result = bigquery.Dataset(
+            const.BQ_TABLE_FQN_ID_SEP.join([table_spec.project_id, table_spec.dataset_id])
+        )
     except Exception as err:  # pylint: disable=broad-except
         msg = (
             f'Could not create input object {bigquery.Dataset.__name__} '
-            f'for project ID <{project_id}> and dataset ID <{dataset_id}>. '
+            f'for project ID <{table_spec.project_id}> and dataset ID <{table_spec.dataset_id}>. '
             f'Error: {err}'
         )
         _LOGGER.critical(msg)
         raise ValueError(msg) from err
     # Create dataset
     try:
-        result = _client(project_id, location).create_dataset(result, exists_ok=exists_ok)
+        result = _client(table_spec.project_id, table_spec.location).create_dataset(
+            result, exists_ok=exists_ok
+        )
     except Exception as err:  # pylint: disable=broad-except
         msg = f'Could not create dataset for <{result.dataset_id}>. Error: {err}'
         _LOGGER.critical(msg)
@@ -260,7 +271,9 @@ def _create_dataset(
     # Add labels
     try:
         result.labels = labels
-        result = _client(project_id, location).update_dataset(result, ['labels'])
+        result = _client(table_spec.project_id, table_spec.location).update_dataset(
+            result, ['labels']
+        )
     except Exception as err:  # pylint: disable=broad-except
         msg = (
             f'Could not set labels for dataset <{result.dataset_id}> '
@@ -274,32 +287,33 @@ def _create_dataset(
 
 def _create_table(  # pylint: disable=too-many-arguments
     dataset: bigquery.Dataset,
-    table_id: str,
+    table_spec: _SimpleTableSpec,
     schema: Sequence[Union[bigquery.schema.SchemaField, Mapping[str, Any]]],
     labels: Dict[str, str],
     exists_ok: Optional[bool] = True,
-    location: Optional[str] = None,
 ) -> bigquery.Table:
     _LOGGER.info(
         'Creating table <%s> in dataset <%s> with labels: <%s>',
-        table_id,
+        table_spec.table_id,
         dataset.dataset_id,
         labels,
     )
     # Table obj
     try:
-        result = dataset.table(table_id)
+        result = dataset.table(table_spec.table_id)
     except Exception as err:  # pylint: disable=broad-except
         msg = (
             f'Could not create input object {bigquery.Table.__name__} '
-            f'for dataset <{dataset.dataset_id}> and table ID <{table_id}>. '
+            f'for dataset <{dataset.dataset_id}> and table ID <{table_spec.table_id}>. '
             f'Error: {err}'
         )
         _LOGGER.critical(msg)
         raise ValueError(msg) from err
     # Create table
     try:
-        result = _client(dataset.project, location).create_table(result, exists_ok=exists_ok)
+        result = _client(dataset.project, table_spec.location).create_table(
+            result, exists_ok=exists_ok
+        )
     except Exception as err:  # pylint: disable=broad-except
         msg = f'Could not create table for <{result.table_id}>. Error: {err}'
         _LOGGER.critical(msg)
@@ -308,7 +322,9 @@ def _create_table(  # pylint: disable=too-many-arguments
     result.labels = labels
     result.schema = schema
     try:
-        result = _client(dataset.project, location).update_table(result, ['labels', 'schema'])
+        result = _client(dataset.project, table_spec.location).update_table(
+            result, ['labels', 'schema']
+        )
     except Exception as err:  # pylint: disable=broad-except
         msg = (
             f'Could not set labels for table <{result.table_id}> '
@@ -320,18 +336,17 @@ def _create_table(  # pylint: disable=too-many-arguments
     return result
 
 
-def drop_table(
-    table_fqn_id: str, location: Optional[str] = None, not_found_ok: Optional[bool] = True
-) -> None:
+def drop_table(*, table_fqn_id: str, not_found_ok: Optional[bool] = True) -> None:
     """
 
-    :param table_fqn_id:
+    :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :param not_found_ok:
     :return:
     """
-    table_fqn_id = _validate_table_fqn_id(table_fqn_id)
-    _LOGGER.info('Dropping table <%s> with not_found_ok=<%s>', table_fqn_id, not_found_ok)
-    _drop_table(bigquery.Table(table_fqn_id), not_found_ok, location)
+    # validate input
+    table_spec = _SimpleTableSpec(table_fqn_id)
+    # logic
+    _drop_table(bigquery.Table(table_spec.table_id_only), not_found_ok, table_spec.location)
 
 
 def _drop_table(table: bigquery.Table, not_found_ok: bool, location: Optional[str] = None) -> None:
@@ -344,31 +359,47 @@ def _drop_table(table: bigquery.Table, not_found_ok: bool, location: Optional[st
         raise ValueError(msg) from err
 
 
-def drop_all_tables_by_labels(
-    project_id: str, location: Optional[str] = None, labels: Optional[Dict[str, str]] = None
-) -> None:
+_FALLBACK_FILTER_FN: Callable[[bigquery.table.TableListItem], bool] = lambda _: True
+
+
+def list_all_tables_with_filter(
+    *,
+    project_id: str,
+    location: Optional[str] = None,
+    filter_fn: Optional[Callable[[bigquery.table.TableListItem], bool]] = None,
+) -> Generator[str, None, None]:
     """
 
     :param project_id:
-    :param labels:
+    :param location:
+    :param filter_fn:
     :return:
     """
-    project_id = _get_stripped_str_arg('project_id', project_id)
+    # validate input
+    project_id = _get_stripped_str_arg('project_id', project_id, True)
     location = _get_stripped_str_arg('location', location, True)
-    labels = _validate_table_labels(labels)
-    _LOGGER.info('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
-    _drop_all_tables_in_iter(_list_all_tables_with_labels(project_id, labels, location), location)
+    if not callable(filter_fn):
+        filter_fn = _FALLBACK_FILTER_FN
+    # logic
+    yield _list_all_tables_with_filter(project_id, location, filter_fn)
 
 
-def _list_all_tables_with_labels(
-    project_id: str, labels: Dict[str, str], location: Optional[str] = None
+def _list_all_tables_with_filter(
+    project_id: str,
+    location: Optional[str] = None,
+    filter_fn: Optional[Callable[[bigquery.table.TableListItem], bool]] = None,
 ) -> Generator[str, None, None]:
-    _LOGGER.info('Listing all tables in project <%s> with labels <%s>', project_id, labels)
+    _LOGGER.info('Listing all tables in project <%s> with filter function', project_id)
     try:
         for ds_list_item in _list_all_datasets(project_id, location):
             for t_list_item in _list_all_tables_in_dataset(ds_list_item, location):
-                if _has_table_labels(t_list_item, labels):
-                    yield f'{project_id}.{ds_list_item.dataset_id}.{t_list_item.table_id}'
+                if filter_fn(t_list_item):
+                    table_fqn_id = const.BQ_TABLE_FQN_ID_SEP.join(
+                        [project_id, ds_list_item.dataset_id, t_list_item.table_id]
+                    )
+                    if location:
+                        table_fqn_id = f'{table_fqn_id}{const.BQ_TABLE_FQN_LOCATION_SEP}{location}'
+                    yield table_fqn_id
     except Exception as err:  # pylint: disable=broad-except
         msg = f'Could not list all datasets in project <{project_id}>. Error: {err}'
         _LOGGER.critical(msg)
@@ -399,29 +430,19 @@ def _list_all_tables_in_dataset(
     return result
 
 
-def _has_table_labels(
-    table_list_item: bigquery.table.TableListItem, labels: Dict[str, str]
-) -> bool:
-    result = True
-    for key, val in labels.items():
-        result = key in table_list_item.labels and val == table_list_item.labels.get(key)
-        if not result:
-            break
-    return result
-
-
-def _drop_all_tables_in_iter(
-    tables_to_drop_gen: Generator[str, None, None], location: Optional[str] = None
-) -> None:
-    error_msgs = []
-    last_error = None
-    for table_fqn_id in tables_to_drop_gen:
-        try:
-            drop_table(table_fqn_id, location)
-        except Exception as err:  # pylint: disable=broad-except
-            msg = f'Cloud not drop table <{table_fqn_id}>. Error: {err}'
-            _LOGGER.critical(msg)
-            error_msgs.append(msg)
-            last_error = err
-    if last_error is not None:
-        raise RuntimeError('+++'.join(error_msgs)) from last_error
+def cross_region_dataset_copy() -> None:
+    """
+    Equivalent to::
+        bq mk --transfer_config \
+            --data_source=cross_region_copy \
+            --project_id=<TARGET_PROJECT_ID> \
+            --target_dataset=<TARGET_DATASET_ID> \
+            --display_name=<TARGET_DATASET_ID> \
+            --params='{
+                "source_project_id":"<SOURCE_PROJECT_ID>",
+                "source_dataset_id":"<SOURCE_DATASET_ID>",
+                "overwrite_destination_table":"true"
+            }'
+    :return:
+    """
+    pass

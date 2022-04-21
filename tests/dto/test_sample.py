@@ -203,7 +203,7 @@ class TestTableReference:
         assert obj.project_id == project_id
         assert obj.dataset_id == dataset_id
         assert obj.table_id == table_id
-        assert obj.region == region
+        assert obj.location == region
         obj_dict = attrs.asdict(obj)
         assert obj == sample.TableReference.from_dict(obj_dict)
 

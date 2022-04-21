@@ -18,22 +18,6 @@ import attrs
 _LOGGER = logging.getLogger(__name__)
 
 
-ATTRS_DEFAULTS: Dict[str, Any] = dict(
-    kw_only=True,
-    str=True,
-    repr=True,
-    eq=True,
-    hash=True,
-    frozen=True,
-    slots=True,
-)
-"""
-See `attrs`_ documentation for details.
-
-.. _attrs: https://www.attrs.org/en/stable/api.html#attr.s
-"""
-
-
 class HasIsEmpty:  # pylint: disable=too-few-public-methods
     """
     To add :py:meth:`is_empty` to children.

@@ -2,14 +2,15 @@
 """
 DTOs to encode the sample request.
 """
-from typing import Any
+from typing import Any, Optional
 
 import attrs
 
+from bq_sampler import const
 from bq_sampler.dto import attrs_defaults
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class SampleSize(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     Sample size as in::
@@ -35,11 +36,11 @@ class SortDirection(attrs_defaults.EnumWithFromStrIgnoreCase):
     Available sorting directions.
     """
 
-    ASC = "ASC"
-    DESC = "DESC"
+    ASC = const.BQ_ORDER_BY_ASC
+    DESC = const.BQ_ORDER_BY_DESC
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _SortProperties(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO for sort properties as in::
@@ -92,7 +93,7 @@ class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
         return SortType.RANDOM
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO for the sort algorithm as in::
@@ -127,7 +128,7 @@ class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-publ
             )
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO for a sample definition as in::
@@ -218,10 +219,7 @@ class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
         return False
 
 
-_BQ_ID_SEP: str = '.'
-
-
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to fully specify a table location
@@ -230,44 +228,55 @@ class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pub
     project_id: str = attrs.field(validator=attrs.validators.instance_of(str))
     dataset_id: str = attrs.field(validator=attrs.validators.instance_of(str))
     table_id: str = attrs.field(validator=attrs.validators.instance_of(str))
-    region: str = attrs.field(
+    location: str = attrs.field(
         default=None,
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(str)),
     )
 
-    def get_table_fqn(self) -> str:
+    def table_fqn_id(self, include_location: Optional[bool] = True) -> str:
         """
         Returns the full-qualified table ID for BigQuery.
         Same as::
-            '.'.join([project_id, dataset_id, table_id])
+            table_fqn_id = '.'.join([project_id, dataset_id, table_id])
+        If the location is given, it adds::
+            table_fqn_id += '@' + location
         :return:
         """
-        return _BQ_ID_SEP.join(
+        result = const.BQ_TABLE_FQN_ID_SEP.join(
             (val.strip() for val in [self.project_id, self.dataset_id, self.table_id])
         )
+        if include_location and self.location and self.location.strip():
+            result = f'{result}{const.BQ_TABLE_FQN_LOCATION_SEP}{self.location.strip()}'
+        return result
 
     @classmethod
     def from_str(cls, value: str) -> Any:
         """
         Creates a new instance of :py:class:`TableReference`
             based on the fully-qualified table name.
-        Format: `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>`
+        Format: `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`
 
         :param value:
         :return:
         """
         if not isinstance(value, str):
             raise ValueError(f'Argument must be a {str.__name__}. Got: <{value}>({type(value)})')
-        project_id, dataset_id, table_id = (v.strip() for v in value.split(_BQ_ID_SEP))
+        table_id = value
+        location = None
+        if const.BQ_TABLE_FQN_LOCATION_SEP in value:
+            table_id, location = value.split(const.BQ_TABLE_FQN_LOCATION_SEP)
+        project_id, dataset_id, table_id = (
+            v.strip() for v in table_id.split(const.BQ_TABLE_FQN_ID_SEP)
+        )
         if not project_id or not dataset_id or not table_id:
             raise ValueError(
                 f'Argument must be in the format: <PROJECT_ID>.<DATASET_ID>.<TABLE_ID>. '
                 f'Got: {value}'
             )
-        return cls(project_id=project_id, dataset_id=dataset_id, table_id=table_id)
+        return cls(project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location)
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class TableSample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the sample

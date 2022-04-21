@@ -13,15 +13,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from google.cloud import bigquery
 
+from bq_sampler import const
 from bq_sampler.dto import sample
 from bq_sampler.gcp import big_query
+from bq_sampler.gcp import bq_helper
 
 
 _LOGGER = logging.getLogger(__name__)
 
-SORT_ASC: str = "ASC"
-SORT_DESC: str = "DESC"
-_BQ_VALID_SORTING: List[str] = [SORT_ASC, SORT_DESC]
+_BQ_VALID_SORTING: List[str] = [const.BQ_ORDER_BY_ASC, const.BQ_ORDER_BY_DESC]
 
 _BQ_PERCENT_INT_PARAM: str = 'percent_int'
 _BQ_ROW_AMOUNT_INT_PARAM: str = 'row_amount_int'
@@ -112,7 +112,7 @@ def create_random_sample(
     _validate_amount(amount)
     _validate_table_reference('table_ref', table_ref)
     # logic
-    return _create_random_sample(table_ref.get_table_fqn(), amount)
+    return _create_random_sample(table_ref, amount)
 
 
 def _validate_table_reference(arg_name: str, table_ref: sample.TableReference) -> None:
@@ -144,14 +144,20 @@ def _validate_amount(amount: int) -> None:
         )
 
 
-def _create_random_sample(table_fqn_id: str, amount: int) -> bigquery.table.RowIterator:
-    _LOGGER.info('Getting random sample of <%d> rows from table <%s>', amount, table_fqn_id)
+def _create_random_sample(
+    table_ref: sample.TableReference, amount: int
+) -> bigquery.table.RowIterator:
+    _LOGGER.info('Getting random sample of <%d> rows from table <%s>', amount, table_ref)
     # query
-    percent_int = _get_int_percent(table_fqn_id, amount)
+    percent_int = _get_int_percent(table_ref.table_fqn_id(), amount)
     query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
-        source_table_fqn_id=table_fqn_id, amount=amount, percent_int=percent_int
+        source_table_fqn_id=table_ref.table_fqn_id(False), amount=amount, percent_int=percent_int
     )
-    return big_query.query_job_result(_BQ_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders)
+    return bq_helper.query_job_result(
+        query=_BQ_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
+        project_id=table_ref.project_id,
+        location=table_ref.location,
+    )
 
 
 def _get_named_placeholders(  # pylint: disable=too-many-arguments
@@ -180,7 +186,9 @@ def _get_named_placeholders(  # pylint: disable=too-many-arguments
 
 
 def _get_int_percent(table_fqn_id: str, amount: int) -> int:
-    size = big_query.get_table_row_count(table_fqn_id)
+    size = bq_helper.get_table_row_count(table_fqn_id=table_fqn_id)
+    if not isinstance(size, int) or size <= 0:
+        raise ValueError(f'Table {table_fqn_id} number of rows must be greater than 0. Got: <{size}>')
     percent = int(math.ceil(amount / size * 100.0))
     return min(100, max(1, percent))
 
@@ -209,23 +217,27 @@ def create_sorted_sample(
     order = _validate_order(order)
     (column,) = _validate_str_args(column)
     _validate_table_reference('table_ref', table_ref)
-    return _create_sorted_sample(table_ref.get_table_fqn(), amount, column, order)
+    return _create_sorted_sample(table_ref, amount, column, order)
 
 
 def _create_sorted_sample(
-    table_fqn_id: str, amount: int, column: str, order: str
+    table_ref: sample.TableReference, amount: int, column: str, order: str
 ) -> bigquery.table.RowIterator:
     _LOGGER.info(
         'Getting sorted by <%s>:<%s> sample of <%d> rows from table <%s>',
         column,
         order,
         amount,
-        table_fqn_id,
+        table_ref,
     )
     query_placeholders = _get_named_placeholders(
-        source_table_fqn_id=table_fqn_id, amount=amount, column=column, order=order
+        source_table_fqn_id=table_ref.table_fqn_id(False), amount=amount, column=column, order=order
     )
-    return big_query.query_job_result(_BQ_SORTED_SAMPLE_QUERY_TMPL % query_placeholders)
+    return bq_helper.query_job_result(
+        query=_BQ_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
+        project_id=table_ref.project_id,
+        location=table_ref.location,
+    )
 
 
 def _validate_order(order: str) -> str:
@@ -260,8 +272,8 @@ def create_table_with_random_sample(
     _validate_table_reference('target_table_ref', target_table_ref)
     # logic
     _create_table_with_random_sample(
-        source_table_ref.get_table_fqn(),
-        target_table_ref.get_table_fqn(),
+        source_table_ref,
+        target_table_ref,
         amount,
         labels,
         recreate_table,
@@ -269,23 +281,29 @@ def create_table_with_random_sample(
 
 
 def _create_table_with_random_sample(
-    source_table_fqn_id: str,
-    target_table_fqn_id: str,
+    source_table_ref: sample.TableReference,
+    target_table_ref: sample.TableReference,
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> None:
     # create table
-    _create_table(source_table_fqn_id, target_table_fqn_id, labels, recreate_table)
+    _create_table(
+        source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
+    )
     # insert data
-    percent_int = _get_int_percent(source_table_fqn_id, amount)
+    percent_int = _get_int_percent(source_table_ref.table_fqn_id(), amount)
     query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
-        source_table_fqn_id=source_table_fqn_id,
-        target_table_fqn_id=target_table_fqn_id,
+        source_table_fqn_id=source_table_ref.table_fqn_id(False),
+        target_table_fqn_id=target_table_ref.table_fqn_id(False),
         amount=amount,
         percent_int=percent_int,
     )
-    big_query.query_job_result(_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders)
+    bq_helper.query_job_result(
+        query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
+        project_id=target_table_ref.project_id,
+        location=target_table_ref.location,
+    )
 
 
 def _create_table(
@@ -294,8 +312,13 @@ def _create_table(
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> None:
-    src_table = big_query.get_table(source_table_fqn_id)
-    big_query.create_table(target_table_fqn_id, src_table.schema, labels, recreate_table)
+    src_table = big_query.get_table(table_fqn_id=source_table_fqn_id)
+    big_query.create_table(
+        table_fqn_id=target_table_fqn_id,
+        schema=src_table.schema,
+        labels=labels,
+        drop_table_before=recreate_table,
+    )
 
 
 def create_table_with_sorted_sample(
@@ -325,8 +348,8 @@ def create_table_with_sorted_sample(
     _validate_table_reference('target_table_ref', target_table_ref)
     # logic
     _create_table_with_sorted_sample(
-        source_table_ref.get_table_fqn(),
-        target_table_ref.get_table_fqn(),
+        source_table_ref,
+        target_table_ref,
         amount,
         column,
         order,
@@ -336,8 +359,8 @@ def create_table_with_sorted_sample(
 
 
 def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
-    source_table_fqn_id: str,
-    target_table_fqn_id: str,
+    source_table_ref: sample.TableReference,
+    target_table_ref: sample.TableReference,
     amount: int,
     column: str,
     order: str,
@@ -345,13 +368,19 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     recreate_table: Optional[bool] = True,
 ) -> None:
     # create table
-    _create_table(source_table_fqn_id, target_table_fqn_id, labels, recreate_table)
+    _create_table(
+        source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
+    )
     # insert data
     query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
-        source_table_fqn_id=source_table_fqn_id,
-        target_table_fqn_id=target_table_fqn_id,
+        source_table_fqn_id=source_table_ref.table_fqn_id(False),
+        target_table_fqn_id=target_table_ref.table_fqn_id(False),
         amount=amount,
         column=column,
         order=order,
     )
-    big_query.query_job_result(_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders)
+    bq_helper.query_job_result(
+        query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
+        project_id=target_table_ref.project_id,
+        location=target_table_ref.location,
+    )
