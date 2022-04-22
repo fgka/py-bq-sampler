@@ -11,6 +11,11 @@ import os
 
 import flask
 
+from bq_sampler.dto import request
+from bq_sampler import process_request
+
+_LOGGER = logging.getLogger(__name__)
+
 
 def handler(  # pylint: disable=unused-argument
     event: Optional[Dict[str, Any]] = None,
@@ -32,10 +37,18 @@ def handler(  # pylint: disable=unused-argument
         Response object using
         `make_response <https://flask.palletsprojects.com/en/1.1.x/api/#flask.Flask.make_response>`.
     """
-    logging.debug('Event: <%s>', event)
-    logging.debug('Context: <%s>', context)
-    logging.debug('Environment: %s', str(os.environ))
-    logging.info('Starting CSV upload')
-    # TODO
-    logging.info('Finished CSV upload')
+    _LOGGER.debug('Event: <%s>', event)
+    _LOGGER.debug('Context: <%s>', context)
+    _LOGGER.debug('Environment: %s', str(os.environ))
+    _LOGGER.info('Starting CSV upload')
+    event_request = _parse_request(event, context)
+    process_request.process(event_request)
+    _LOGGER.info('Finished CSV upload')
     return flask.jsonify(success=True)
+
+
+def _parse_request(
+    event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None
+) -> request.EventRequest:
+    # TODO
+    pass

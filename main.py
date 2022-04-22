@@ -23,6 +23,8 @@ import flask  # pylint: disable=wrong-import-position
 
 from bq_sampler import gcp_function  # pylint: disable=wrong-import-position
 
+_LOGGER = logging.getLogger(__name__)
+
 
 def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
     event: Optional[dict] = None, context: Optional[Any] = None, *args, **kwargs
@@ -49,16 +51,16 @@ def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
     Returns:
         Proxied response from the actual implementation.
     """
-    logging.info('Processing event <%s> and context <%s>', event, context)
+    _LOGGER.info('Processing event <%s> and context <%s>', event, context)
     event_data = event.get('data') if event is not None else None
     if event_data is not None:
         data = base64.b64decode(event_data).decode('utf-8')
-        logging.info('Event data: <%s>', data)
+        _LOGGER.info('Event data: <%s>', data)
     try:
         result = gcp_function.handler(event, context)
     except Exception as err:  # pylint: disable=broad-except
         msg = f'Error processing event <{event}> and context <{context}>. Error: {err}'
-        logging.critical(msg)
-        logging.warning('Environment: %s', str(os.environ))
+        _LOGGER.critical(msg)
+        _LOGGER.warning('Environment: %s', str(os.environ))
         flask.abort(500, {'message': msg})
     return result
