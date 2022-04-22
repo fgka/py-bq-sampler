@@ -227,6 +227,15 @@ class HasFromJsonString(HasFromDict):
             raise ValueError(msg) from err
         return result
 
+    def as_dict(self) -> Dict[str, str]:
+        """
+        Simple wrapper for::
+            attrs.asdict(self)
+
+        :return:
+        """
+        return attrs.asdict(self)
+
 
 class EnumWithFromStrIgnoreCase(enum.Enum):
     """

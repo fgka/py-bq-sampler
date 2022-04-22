@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
     event: Optional[dict] = None, context: Optional[Any] = None, *args, **kwargs
-) -> Any:
+) -> None:
     """Entry-point for GCP CloudFunction.
     This is just a proxy to keep the code organized in a pythonic way.
 
@@ -57,10 +57,9 @@ def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
         data = base64.b64decode(event_data).decode('utf-8')
         _LOGGER.info('Event data: <%s>', data)
     try:
-        result = gcp_function.handler(event, context)
+        gcp_function.handler(event, context)
     except Exception as err:  # pylint: disable=broad-except
         msg = f'Error processing event <{event}> and context <{context}>. Error: {err}'
         _LOGGER.critical(msg)
         _LOGGER.warning('Environment: %s', str(os.environ))
         flask.abort(500, {'message': msg})
-    return result

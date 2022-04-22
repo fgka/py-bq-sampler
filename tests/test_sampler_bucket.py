@@ -8,6 +8,7 @@
 from typing import Set
 
 from bq_sampler.dto import policy
+from bq_sampler import const
 from bq_sampler import sampler_bucket
 
 from tests import gcs_on_disk
@@ -32,11 +33,11 @@ def _patch_gcs_storage(monkeypatch):
     monkeypatch.setattr(sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names)
 
 
-def test__get_default_policy_ok(monkeypatch):
+def test__default_policy_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
-    result = sampler_bucket._get_default_policy(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
+    result = sampler_bucket._default_policy(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
     # Then
     assert isinstance(result, policy.Policy)
     assert result is not policy.FALLBACK_GENERIC_POLICY
@@ -53,7 +54,7 @@ def test__list_all_table_references_obj_path_ok(monkeypatch):
         assert (
             obj_path
             == '/'.join([table_ref.project_id, table_ref.dataset_id, table_ref.table_id])
-            + sampler_bucket._JSON_EXT
+            + const.JSON_EXT
         )
 
 
@@ -69,15 +70,13 @@ _MANDATORY_PRESENT_POLICIES: Set[str] = set(
 )
 
 
-def test_get_all_policies_ok(monkeypatch):
+def test_all_policies_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
-    default_policy = sampler_bucket._get_default_policy(
-        gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
-    )
+    default_policy = sampler_bucket._default_policy(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
     # When
     tables = set()
-    for t_pol in sampler_bucket.get_all_policies(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH):
+    for t_pol in sampler_bucket.all_policies(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH):
         table_id = t_pol.table_reference.table_id
         tables.add(table_id)
         # Then
@@ -140,12 +139,12 @@ _REQUEST_HAS_SORT_ALGORITHM: Set[str] = set(
 )
 
 
-def test_get_all_sample_requests_ok(monkeypatch):
+def test_all_sample_requests_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
     # When
     tables = set()
-    for t_req in sampler_bucket.get_all_sample_requests(gcs_on_disk.REQUEST_BUCKET):
+    for t_req in sampler_bucket.all_sample_requests(gcs_on_disk.REQUEST_BUCKET):
         table_id = t_req.table_reference.table_id
         tables.add(table_id)
         # Then

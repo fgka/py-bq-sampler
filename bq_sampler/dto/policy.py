@@ -119,7 +119,7 @@ To be used as the absolute minimum default policy.
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class TablePolicy(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class TablePolicy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the policy
     """

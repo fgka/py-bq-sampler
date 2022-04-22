@@ -11,8 +11,8 @@ import os
 
 import flask
 
-from bq_sampler.dto import request
 from bq_sampler import process_request
+from bq_sampler import request_parser
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,10 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 def handler(  # pylint: disable=unused-argument
     event: Optional[Dict[str, Any]] = None,
     context: Optional[Any] = None,
-    *,
-    use_env_var_gcs_path: Optional[bool] = False,
-    add_env_var_moveit_server: Optional[bool] = False,
-) -> Any:
+) -> None:
     """Responds to any HTTP request.
     Args:
         event (dict): Event payload.
@@ -41,14 +38,23 @@ def handler(  # pylint: disable=unused-argument
     _LOGGER.debug('Context: <%s>', context)
     _LOGGER.debug('Environment: %s', str(os.environ))
     _LOGGER.info('Starting CSV upload')
-    event_request = _parse_request(event, context)
-    process_request.process(event_request)
+    event_request = request_parser.to_event_request(event)
+    project_id = _project_id_from_context(context)
+    process_request.process(event_request, project_id)
     _LOGGER.info('Finished CSV upload')
-    return flask.jsonify(success=True)
+    flask.jsonify(success=True)
 
 
-def _parse_request(
-    event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None
-) -> request.EventRequest:
-    # TODO
-    pass
+def _project_id_from_context(context: Optional[Any] = None) -> Optional[str]:
+    result = None
+    if context is not None:
+        resource_name = context.resource.get('name') if context.resource else None
+        # something like: "projects/lhg-csv-moveit-upload/topics/cron-lhg-csv-moveit-upload"
+        if resource_name:
+            result = resource_name.split('/')[1]  # lhg-csv-moveit-upload
+            _LOGGER.info('Got project ID <%s> from resource name <%s>', result, resource_name)
+        else:
+            _LOGGER.error('Context resource has no entry "name": %s', context)
+    else:
+        _LOGGER.error('There is no context object from which to extract the project ID')
+    return result

@@ -10,18 +10,18 @@ List all project IDs that should be sampled. It assumes the following structure 
 
 """
 import logging
-from typing import Any, Callable, Generator, Tuple
+from typing import Any, Callable, Generator, Optional, Tuple
 
+from bq_sampler import const
 from bq_sampler.gcp import gcs
 from bq_sampler.dto import policy
 from bq_sampler.dto import sample
 
 
 _LOGGER = logging.getLogger(__name__)
-_JSON_EXT: str = ".json"
 
 
-def get_all_policies(
+def all_policies(
     bucket_name: str, default_policy_object_path: str
 ) -> Generator[policy.TablePolicy, None, None]:
     """
@@ -38,14 +38,14 @@ def get_all_policies(
         default_policy_object_path,
     )
     # default policy
-    default_policy = _get_default_policy(bucket_name, default_policy_object_path)
+    default_policy = _default_policy(bucket_name, default_policy_object_path)
     # all policies
     for table_policy in _retrieve_all_table_policies(bucket_name, default_policy):
         yield table_policy
 
 
-def _get_default_policy(bucket_name: str, default_policy_object_path: str):
-    result = _get_overwritten_policy_from_gcs(
+def _default_policy(bucket_name: str, default_policy_object_path: str):
+    result = _overwritten_policy_from_gcs(
         bucket_name, default_policy_object_path, policy.FALLBACK_GENERIC_POLICY
     )
     logging.info(
@@ -57,11 +57,11 @@ def _get_default_policy(bucket_name: str, default_policy_object_path: str):
     return result
 
 
-def _get_overwritten_policy_from_gcs(
+def _overwritten_policy_from_gcs(
     bucket_name: str, policy_object_path: str, fallback_policy: policy.Policy
 ) -> policy.Policy:
     policy_json_string: str = _fetch_gcs_object_as_string(bucket_name, policy_object_path)
-    result = _get_overwritten_policy(policy.Policy.from_json(policy_json_string), fallback_policy)
+    result = _overwrite_policy(policy.Policy.from_json(policy_json_string), fallback_policy)
     return result
 
 
@@ -80,7 +80,7 @@ def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
     return result
 
 
-def _get_overwritten_policy(
+def _overwrite_policy(
     specific_policy: policy.Policy, fallback_policy: policy.Policy
 ) -> policy.Policy:
     """
@@ -97,7 +97,7 @@ def _retrieve_all_table_policies(
     bucket_name: str, default_policy: policy.Policy
 ) -> Generator[policy.TablePolicy, None, None]:
     def convert_fn(table_reference, obj_path) -> policy.TablePolicy:
-        actual_policy = _get_overwritten_policy_from_gcs(bucket_name, obj_path, default_policy)
+        actual_policy = _overwritten_policy_from_gcs(bucket_name, obj_path, default_policy)
         result = policy.TablePolicy(table_reference=table_reference, policy=actual_policy)
         return result
 
@@ -117,18 +117,18 @@ def _list_all_table_references_obj_path(
     bucket_name: str,
 ) -> Generator[Tuple[sample.TableReference, str], None, None]:
     def filter_fn(value: str) -> bool:
-        return value.endswith(_JSON_EXT) and len(value.split('/')) == 3
+        return value.endswith(const.JSON_EXT) and len(value.split('/')) == 3
 
     for obj_path in gcs.list_objects(bucket_name, filter_fn):
         project_id, dataset_id, table_id_file = obj_path.split('/')
-        table_id = table_id_file[: -len(_JSON_EXT)]
+        table_id = table_id_file[: -len(const.JSON_EXT)]
         table_reference = sample.TableReference(
             project_id=project_id, dataset_id=dataset_id, table_id=table_id
         )
         yield table_reference, obj_path
 
 
-def get_all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None, None]:
+def all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None, None]:
     """
     The output is already containing the requested samples
 
@@ -146,7 +146,7 @@ def get_all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, N
 
 def _retrieve_all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None, None]:
     def convert_fn(table_reference, obj_path) -> sample.TableSample:
-        table_sample = _get_sample_request(bucket_name, obj_path)
+        table_sample = _sample_request(bucket_name, obj_path)
         result = sample.TableSample(table_reference=table_reference, sample=table_sample)
         return result
 
@@ -154,14 +154,14 @@ def _retrieve_all_sample_requests(bucket_name: str) -> Generator[sample.TableSam
         yield request
 
 
-def _get_sample_request(bucket_name: str, request_filename: str) -> sample.Sample:
+def _sample_request(bucket_name: str, request_filename: str) -> sample.Sample:
     sample_json_string: str = _fetch_gcs_object_as_string(bucket_name, request_filename)
     result = sample.Sample.from_json(sample_json_string)
     return result
 
 
-def get_sample_request_from_policy(
-    bucket_name: str, table_policy: policy.TablePolicy
+def sample_request_from_policy(
+    bucket_name: str, table_policy: policy.TablePolicy, sample_project_id: Optional[str] = None
 ) -> sample.TableSample:
     """
     For a given :py:class:`policy.TablePolicy` create a corresponding
@@ -173,18 +173,25 @@ def get_sample_request_from_policy(
     :return:
     """
     # get overwritten request with policy default sample
-    req_sample = _get_sample_request(bucket_name, _json_object_path(table_policy.table_reference))
-    effective_sample = _get_overwritten_request(req_sample, table_policy.policy)
-    result = sample.TableSample(
-        table_reference=table_policy.table_reference, sample=effective_sample
-    )
+    req_sample = _sample_request(bucket_name, _json_object_path(table_policy.table_reference))
+    effective_sample = _overwrite_request(req_sample, table_policy.policy)
+    table_reference = _table_reference(table_policy.table_reference, sample_project_id)
+    result = sample.TableSample(table_reference=table_reference, sample=effective_sample)
     return result
 
 
-def _get_overwritten_request(
-    request: sample.Sample, request_policy: policy.Policy
-) -> sample.Sample:
+def _overwrite_request(request: sample.Sample, request_policy: policy.Policy) -> sample.Sample:
     return request.patch_with(request_policy.default_sample)
+
+
+def _table_reference(source: sample.TableReference, sample_project_id: Optional[str] = None):
+    # TODO test
+    result = source
+    if isinstance(sample_project_id, str) and sample_project_id.strip():
+        table_reference_dict = source.to_dict()
+        table_reference_dict['project_id'] = sample_project_id.strip()
+        result = sample.TableReference.from_dict(table_reference_dict)
+    return result
 
 
 def _json_object_path(table_reference: sample.TableReference) -> str:
@@ -193,6 +200,6 @@ def _json_object_path(table_reference: sample.TableReference) -> str:
             table_reference.project_id,
             table_reference.dataset_id,
             table_reference.table_id,
-            _JSON_EXT,
+            const.JSON_EXT,
         ]
     )

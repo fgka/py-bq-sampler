@@ -25,6 +25,16 @@ ATTRS_DEFAULTS: Dict[str, bool] = dict(
     slots=True,
 )
 
+
+##########################
+#  Samples and Policies  #
+##########################
+
+JSON_EXT: str = '.json'
+
+SAMPLE_TYPE_RANDOM: str = 'random'
+SAMPLE_TYPE_SORTED: str = 'sorted'
+
 ##############
 #  BigQuery  #
 ##############
@@ -32,8 +42,8 @@ ATTRS_DEFAULTS: Dict[str, bool] = dict(
 BQ_TABLE_FQN_ID_SEP: str = '.'
 BQ_TABLE_FQN_LOCATION_SEP: str = '@'
 
-BQ_ORDER_BY_ASC = "ASC"
-BQ_ORDER_BY_DESC = "DESC"
+BQ_ORDER_BY_ASC: str = 'ASC'
+BQ_ORDER_BY_DESC: str = 'DESC'
 
 DEFAULT_CREATE_TABLE_LABELS: Dict[str, str] = {
     'sample_table': 'true',
@@ -41,3 +51,11 @@ DEFAULT_CREATE_TABLE_LABELS: Dict[str, str] = {
 """
 Default GCP resource label to be applied table created here.
 """
+
+###################
+#  Event Request  #
+###################
+
+REQUEST_TYPE_START = 'START'
+REQUEST_TYPE_SAMPLE_START = 'SAMPLE_START'
+REQUEST_TYPE_SAMPLE_DONE = 'SAMPLE_DONE'

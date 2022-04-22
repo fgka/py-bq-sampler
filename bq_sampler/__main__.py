@@ -82,7 +82,7 @@ def _read_and_print_specific_policy(in_text: io.TextIOWrapper) -> policy_.Policy
 
 def _patch_and_print_policy(policy_a: policy_.Policy, policy_b: policy_.Policy) -> policy_.Policy:
     # pylint: disable=protected-access
-    result = sampler_bucket._get_overwritten_policy(policy_a, policy_b)
+    result = sampler_bucket._overwrite_policy(policy_a, policy_b)
     _print_policy('Effective policy:', result)
     return result
 
@@ -139,7 +139,7 @@ def _patch_and_print_request(
     request: sample.Sample, request_policy: policy_.Policy
 ) -> sample.Sample:
     # pylint: disable=protected-access
-    result = sampler_bucket._get_overwritten_request(request, request_policy)
+    result = sampler_bucket._overwrite_request(request, request_policy)
     _print_policy('Effective request:', result)
     return result
 

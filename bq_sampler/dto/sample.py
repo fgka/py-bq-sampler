@@ -11,7 +11,7 @@ from bq_sampler.dto import attrs_defaults
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class SampleSize(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class SampleSize(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     Sample size as in::
         size = {
@@ -41,7 +41,7 @@ class SortDirection(attrs_defaults.EnumWithFromStrIgnoreCase):
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class _SortProperties(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class _SortProperties(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO for sort properties as in::
         sort_properties = {
@@ -80,8 +80,8 @@ class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
     Which type of sorting is supported in the sample.
     """
 
-    RANDOM = "random"
-    SORTED = "sorted"
+    RANDOM = const.SAMPLE_TYPE_RANDOM
+    SORTED = const.SAMPLE_TYPE_SORTED
 
     @classmethod
     def default(cls) -> Any:
@@ -94,7 +94,7 @@ class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class SortAlgorithm(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class SortAlgorithm(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO for the sort algorithm as in::
         sort_algorithm = {
@@ -220,7 +220,7 @@ class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class TableReference(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO to fully specify a table location
     """
@@ -279,7 +279,7 @@ class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pub
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class TableSample(attrs_defaults.HasFromDict):  # pylint: disable=too-few-public-methods
+class TableSample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO to include the table reference for the sample
     """
