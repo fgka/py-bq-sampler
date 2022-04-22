@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 import cachetools
 
-from bq_sampler.dto import request, sample
+from bq_sampler.dto import request, sample, policy
 from bq_sampler import sampler_bucket, sampler_query
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +28,6 @@ class _GeneralConfig:
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_REQUEST_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
-        self._project_id = os.environ.get('TODO')
 
     @property
     def policy_bucket(self) -> str:  # pylint: disable=missing-function-docstring
@@ -106,23 +105,40 @@ def _process_start(event_request: request.EventRequestStart, project_id: str) ->
             table_policy,
             _general_config().request_bucket,
         )
-        sample_req = sampler_bucket.sample_request_from_policy(
+        table_sample = sampler_bucket.sample_request_from_policy(
             bucket_name=_general_config().request_bucket,
             table_policy=table_policy,
             sample_project_id=project_id,
         )
-        # TODO compliance
-        # TODO count
-        event_dict = event_request.as_dict()
-        event_dict['sample_request'] = sample_req.as_dict()
-        event_dict['source_table'] = table_policy.table_reference.as_dict()
-        event_sample_req = request.EventRequestSampleStart.from_dict(event_dict)
-        _publish_event_request_to_pubsub(event_sample_req)
+        # compliance enforcement
+        table_sample = _compliant_sample_request(table_policy, table_sample)
+        # create sample request event
+        start_sample_req = _create_sample_start_request(event_request, table_policy, table_sample)
+        # send request out
+        _publish_event_request_to_pubsub(start_sample_req)
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
 def _general_config() -> _GeneralConfig:
     return _GeneralConfig()
+
+
+def _compliant_sample_request(
+    table_policy: policy.TablePolicy, table_sample: sample.TableSample
+) -> sample.TableSample:
+    row_count = sampler_query.row_count(table_sample.table_reference)
+    return table_policy.compliant_sample(table_sample, row_count)
+
+
+def _create_sample_start_request(
+    event_request: request.EventRequestStart,
+    table_policy: policy.TablePolicy,
+    table_sample: sample.TableSample,
+) -> request.EventRequestSampleStart:
+    event_dict = event_request.as_dict()
+    event_dict['sample_request'] = table_sample.as_dict()
+    event_dict['source_table'] = table_policy.table_reference.as_dict()
+    return request.EventRequestSampleStart.from_dict(event_dict)
 
 
 def _publish_event_request_to_pubsub(event_request: request.EventRequest) -> None:

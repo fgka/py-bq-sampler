@@ -91,6 +91,16 @@ Uses `INSERT`_ statements combined with `SELECT`_ statement using `ORDER BY`_ cl
 # pylint: enable=line-too-long
 
 
+def row_count(table_ref: sample.TableReference) -> int:
+    """
+    Simple wrapper to :py:func:`bq.row_count`
+
+    :param table_ref:
+    :return:
+    """
+    return bq.row_count(table_fqn_id=table_ref.table_fqn_id())
+
+
 def random_sample(*, table_ref: sample.TableReference, amount: int) -> bigquery.table.RowIterator:
     """
     This will query the target table using BigQuery's `TABLESAMPLE`_ clause.

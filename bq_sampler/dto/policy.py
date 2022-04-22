@@ -128,3 +128,15 @@ class TablePolicy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-
         validator=attrs.validators.instance_of(sample.TableReference)
     )
     policy: Policy = attrs.field(validator=attrs.validators.instance_of(Policy))
+
+    def compliant_sample(
+        self, table_sample: sample.TableSample, row_count: int
+    ) -> sample.TableSample:
+        """
+        Will apply the policy to the table sample and return a compliant instance.
+
+        :param table_sample:
+        :param row_count:
+        :return:
+        """
+        raise NotImplementedError()
