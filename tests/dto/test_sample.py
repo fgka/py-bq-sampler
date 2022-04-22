@@ -184,41 +184,41 @@ class TestSample:
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
 _TEST_DATASET_ID: str = 'TEST_DATASET_ID'
 _TEST_TABLE_ID: str = 'TEST_TABLE_ID'
-_TEST_REGION: str = 'TEST_REGION'
+_TEST_LOCATION: str = 'TEST_REGION'
 
 
 @pytest.mark.incremental
 class TestTableReference:
     @pytest.mark.parametrize(
-        'project_id,dataset_id,table_id,region',
+        'project_id,dataset_id,table_id,location',
         [
             (_TEST_PROJECT_ID, _TEST_DATASET_ID, _TEST_TABLE_ID, None),
-            (_TEST_PROJECT_ID, _TEST_DATASET_ID, _TEST_TABLE_ID, _TEST_REGION),
+            (_TEST_PROJECT_ID, _TEST_DATASET_ID, _TEST_TABLE_ID, _TEST_LOCATION),
         ],
     )
-    def test_ctor_ok(self, project_id: str, dataset_id: str, table_id: str, region: str):
+    def test_ctor_ok(self, project_id: str, dataset_id: str, table_id: str, location: str):
         obj = sample.TableReference(
-            project_id=project_id, dataset_id=dataset_id, table_id=table_id, region=region
+            project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
         )
         assert obj.project_id == project_id
         assert obj.dataset_id == dataset_id
         assert obj.table_id == table_id
-        assert obj.location == region
+        assert obj.location == location
         obj_dict = attrs.asdict(obj)
         assert obj == sample.TableReference.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
-        'project_id,dataset_id,table_id,region',
+        'project_id,dataset_id,table_id,location',
         [
             (None, _TEST_DATASET_ID, _TEST_TABLE_ID, None),
             (_TEST_PROJECT_ID, None, _TEST_TABLE_ID, None),
             (_TEST_PROJECT_ID, _TEST_DATASET_ID, None, None),
         ],
     )
-    def test_ctor_nok_type(self, project_id: Any, dataset_id: Any, table_id: Any, region: Any):
+    def test_ctor_nok_type(self, project_id: Any, dataset_id: Any, table_id: Any, location: Any):
         with pytest.raises(TypeError):
             sample.TableReference(
-                project_id=project_id, dataset_id=dataset_id, table_id=table_id, region=region
+                project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
             )
 
 
@@ -226,7 +226,7 @@ _TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
     project_id=_TEST_PROJECT_ID,
     dataset_id=_TEST_DATASET_ID,
     table_id=_TEST_TABLE_ID,
-    region=_TEST_REGION,
+    location=_TEST_LOCATION,
 )
 
 

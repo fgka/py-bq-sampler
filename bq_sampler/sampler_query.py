@@ -15,8 +15,7 @@ from google.cloud import bigquery
 
 from bq_sampler import const
 from bq_sampler.dto import sample
-from bq_sampler.gcp import big_query
-from bq_sampler.gcp import bq_helper
+from bq_sampler.gcp import bq
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,10 +74,10 @@ Uses `INSERT`_ statements combined with `SELECT`_ statement using `TABLESAMPLE`_
 """
 # pylint: enable=line-too-long
 
-_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL: str = f"""
+_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL: str = f"""
     INSERT INTO `%({_BQ_TARGET_TABLE_PARAM})s`
     SELECT * FROM `%({_BQ_SOURCE_TABLE_PARAM})s`
-    TABLESAMPLE SYSTEM (%({_BQ_PERCENT_INT_PARAM})d PERCENT)
+    ORDER BY %({_BQ_ORDER_BY_COLUMN})s %({_BQ_ORDER_BY_DIRECTION})s
     LIMIT %({_BQ_ROW_AMOUNT_INT_PARAM})d
 """
 # pylint: disable=line-too-long
@@ -92,9 +91,7 @@ Uses `INSERT`_ statements combined with `SELECT`_ statement using `ORDER BY`_ cl
 # pylint: enable=line-too-long
 
 
-def create_random_sample(
-    *, table_ref: sample.TableReference, amount: int
-) -> bigquery.table.RowIterator:
+def random_sample(*, table_ref: sample.TableReference, amount: int) -> bigquery.table.RowIterator:
     """
     This will query the target table using BigQuery's `TABLESAMPLE`_ clause.
     This is important to know because for large tables the minimum amount is 1%
@@ -109,10 +106,10 @@ def create_random_sample(
     .. TABLESAMPLE: https://cloud.google.com/bigquery/docs/table-sampling
     """
     # validate input
-    _validate_amount(amount)
     _validate_table_reference('table_ref', table_ref)
+    _validate_amount(amount)
     # logic
-    return _create_random_sample(table_ref, amount)
+    return _random_sample(table_ref, amount)
 
 
 def _validate_table_reference(arg_name: str, table_ref: sample.TableReference) -> None:
@@ -144,23 +141,21 @@ def _validate_amount(amount: int) -> None:
         )
 
 
-def _create_random_sample(
-    table_ref: sample.TableReference, amount: int
-) -> bigquery.table.RowIterator:
+def _random_sample(table_ref: sample.TableReference, amount: int) -> bigquery.table.RowIterator:
     _LOGGER.info('Getting random sample of <%d> rows from table <%s>', amount, table_ref)
     # query
-    percent_int = _get_int_percent(table_ref.table_fqn_id(), amount)
-    query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
+    percent_int = _int_percent_for_tablesample_stmt(table_ref.table_fqn_id(), amount)
+    query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
         source_table_fqn_id=table_ref.table_fqn_id(False), amount=amount, percent_int=percent_int
     )
-    return bq_helper.query_job_result(
+    return bq.query_job_result(
         query=_BQ_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
         project_id=table_ref.project_id,
         location=table_ref.location,
     )
 
 
-def _get_named_placeholders(  # pylint: disable=too-many-arguments
+def _named_placeholders(  # pylint: disable=too-many-arguments
     *,
     source_table_fqn_id: Optional[str] = None,
     target_table_fqn_id: Optional[str] = None,
@@ -185,15 +180,17 @@ def _get_named_placeholders(  # pylint: disable=too-many-arguments
     return result
 
 
-def _get_int_percent(table_fqn_id: str, amount: int) -> int:
-    size = bq_helper.get_table_row_count(table_fqn_id=table_fqn_id)
+def _int_percent_for_tablesample_stmt(table_fqn_id: str, amount: int) -> int:
+    size = bq.row_count(table_fqn_id=table_fqn_id)
     if not isinstance(size, int) or size <= 0:
-        raise ValueError(f'Table {table_fqn_id} number of rows must be greater than 0. Got: <{size}>')
+        raise ValueError(
+            f'Table {table_fqn_id} number of rows must be greater than 0. Got: <{size}>'
+        )
     percent = int(math.ceil(amount / size * 100.0))
     return min(100, max(1, percent))
 
 
-def create_sorted_sample(
+def sorted_sample(
     *, table_ref: sample.TableReference, amount: int, column: str, order: str
 ) -> bigquery.table.RowIterator:
     # pylint: disable=line-too-long
@@ -213,14 +210,15 @@ def create_sorted_sample(
     """
     # pylint: enable=line-too-long
     # validate input
-    _validate_amount(amount)
-    order = _validate_order(order)
-    (column,) = _validate_str_args(column)
     _validate_table_reference('table_ref', table_ref)
-    return _create_sorted_sample(table_ref, amount, column, order)
+    _validate_amount(amount)
+    (column,) = _validate_str_args(column)
+    order = _validate_order(order)
+    # logic
+    return _sorted_sample(table_ref, amount, column, order)
 
 
-def _create_sorted_sample(
+def _sorted_sample(
     table_ref: sample.TableReference, amount: int, column: str, order: str
 ) -> bigquery.table.RowIterator:
     _LOGGER.info(
@@ -230,10 +228,10 @@ def _create_sorted_sample(
         amount,
         table_ref,
     )
-    query_placeholders = _get_named_placeholders(
+    query_placeholders = _named_placeholders(
         source_table_fqn_id=table_ref.table_fqn_id(False), amount=amount, column=column, order=order
     )
-    return bq_helper.query_job_result(
+    return bq.query_job_result(
         query=_BQ_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
         project_id=table_ref.project_id,
         location=table_ref.location,
@@ -267,9 +265,8 @@ def create_table_with_random_sample(
     :return:
     """
     # validate input
+    _validate_table_to_table_sample(source_table_ref, target_table_ref)
     _validate_amount(amount)
-    _validate_table_reference('source_table_ref', source_table_ref)
-    _validate_table_reference('target_table_ref', target_table_ref)
     # logic
     _create_table_with_random_sample(
         source_table_ref,
@@ -278,6 +275,19 @@ def create_table_with_random_sample(
         labels,
         recreate_table,
     )
+
+
+def _validate_table_to_table_sample(
+    source_table_ref: sample.TableReference,
+    target_table_ref: sample.TableReference,
+) -> None:
+    _validate_table_reference('source_table_ref', source_table_ref)
+    _validate_table_reference('target_table_ref', target_table_ref)
+    if source_table_ref.location != target_table_ref.location:
+        raise ValueError(
+            'Source and target tables must be in the same region. '
+            f'Got, source <{source_table_ref}> and target: <{target_table_ref}>'
+        )
 
 
 def _create_table_with_random_sample(
@@ -292,14 +302,14 @@ def _create_table_with_random_sample(
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
     )
     # insert data
-    percent_int = _get_int_percent(source_table_ref.table_fqn_id(), amount)
-    query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
+    percent_int = _int_percent_for_tablesample_stmt(source_table_ref.table_fqn_id(), amount)
+    query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
         source_table_fqn_id=source_table_ref.table_fqn_id(False),
         target_table_fqn_id=target_table_ref.table_fqn_id(False),
         amount=amount,
         percent_int=percent_int,
     )
-    bq_helper.query_job_result(
+    bq.query_job_result(
         query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
         project_id=target_table_ref.project_id,
         location=target_table_ref.location,
@@ -312,8 +322,8 @@ def _create_table(
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> None:
-    src_table = big_query.get_table(table_fqn_id=source_table_fqn_id)
-    big_query.create_table(
+    src_table = bq.table(table_fqn_id=source_table_fqn_id)
+    bq.create_table(
         table_fqn_id=target_table_fqn_id,
         schema=src_table.schema,
         labels=labels,
@@ -343,9 +353,10 @@ def create_table_with_sorted_sample(
     :return:
     """
     # validate input
+    _validate_table_to_table_sample(source_table_ref, target_table_ref)
     _validate_amount(amount)
-    _validate_table_reference('source_table_ref', source_table_ref)
-    _validate_table_reference('target_table_ref', target_table_ref)
+    (column,) = _validate_str_args(column)
+    order = _validate_order(order)
     # logic
     _create_table_with_sorted_sample(
         source_table_ref,
@@ -372,15 +383,15 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
     )
     # insert data
-    query_placeholders = _get_named_placeholders(  # pylint: disable=missing-kwoa
+    query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
         source_table_fqn_id=source_table_ref.table_fqn_id(False),
         target_table_fqn_id=target_table_ref.table_fqn_id(False),
         amount=amount,
         column=column,
         order=order,
     )
-    bq_helper.query_job_result(
-        query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
+    bq.query_job_result(
+        query=_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
         project_id=target_table_ref.project_id,
         location=target_table_ref.location,
     )

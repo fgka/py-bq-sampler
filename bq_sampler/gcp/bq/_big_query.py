@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
     def __init__(self, table_fqn_id: str):
-        self.table_fqn_id = _get_stripped_str_arg('table_fqn_id', table_fqn_id)
+        self.table_fqn_id = _stripped_str_arg('table_fqn_id', table_fqn_id)
         (
             self.project_id,
             self.dataset_id,
@@ -88,7 +88,7 @@ class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
         return result
 
 
-def _get_stripped_str_arg(name: str, value: str, accept_none: Optional[bool] = False) -> str:
+def _stripped_str_arg(name: str, value: str, accept_none: Optional[bool] = False) -> str:
     if accept_none and value is None:
         result = None
     elif not isinstance(value, str) or not value.strip():
@@ -98,7 +98,7 @@ def _get_stripped_str_arg(name: str, value: str, accept_none: Optional[bool] = F
     return result
 
 
-def get_table(*, table_fqn_id: str) -> bigquery.Table:
+def table(*, table_fqn_id: str) -> bigquery.Table:
     """
     Query table information and returns an initialized instance of :py:class:`bigquery.Table`.
 
@@ -108,10 +108,10 @@ def get_table(*, table_fqn_id: str) -> bigquery.Table:
     # validate input
     table_spec = _SimpleTableSpec(table_fqn_id)
     # logic
-    return _get_table(table_spec)
+    return _table(table_spec)
 
 
-def _get_table(table_spec: _SimpleTableSpec) -> bigquery.table.Table:
+def _table(table_spec: _SimpleTableSpec) -> bigquery.Table:
     try:
         result = _client(table_spec.project_id, table_spec.location).get_table(
             table_spec.table_id_only
@@ -150,9 +150,9 @@ def query_job(
     .. docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
     """
     # validate input
-    query = _get_stripped_str_arg('query', query)
-    project_id = _get_stripped_str_arg('project_id', project_id, True)
-    location = _get_stripped_str_arg('location', location, True)
+    query = _stripped_str_arg('query', query)
+    project_id = _stripped_str_arg('project_id', project_id, True)
+    location = _stripped_str_arg('location', location, True)
     # logic
     result = _query_job(query, job_config, project_id, location)
     _LOGGER.info(
@@ -216,10 +216,10 @@ def create_table(
     _validate_schema(schema)
     # logic
     _LOGGER.info('Creating table <%s> with labels: <%s>', table_fqn_id, labels)
-    dataset = _create_dataset(table_spec, labels)
+    dataset = _create_dataset(table_spec, labels, exists_ok=True)
     if drop_table_before:
-        drop_table(table_fqn_id=table_fqn_id)
-    _create_table(dataset, table_spec, schema, labels)
+        drop_table(table_fqn_id=table_fqn_id, not_found_ok=True)
+    _create_table(dataset, table_spec, schema, labels, exists_ok=not drop_table_before)
 
 
 def _validate_table_labels(labels: Optional[Dict[str, str]] = None) -> str:
@@ -349,12 +349,14 @@ def drop_table(*, table_fqn_id: str, not_found_ok: Optional[bool] = True) -> Non
     _drop_table(bigquery.Table(table_spec.table_id_only), not_found_ok, table_spec.location)
 
 
-def _drop_table(table: bigquery.Table, not_found_ok: bool, location: Optional[str] = None) -> None:
-    _LOGGER.info('Dropping table <%s> with not_found_ok=<%s>', table.table_id, not_found_ok)
+def _drop_table(
+    bq_table: bigquery.Table, not_found_ok: bool, location: Optional[str] = None
+) -> None:
+    _LOGGER.info('Dropping table <%s> with not_found_ok=<%s>', bq_table.table_id, not_found_ok)
     try:
-        _client(table.project, location).delete_table(table, not_found_ok=not_found_ok)
+        _client(bq_table.project, location).delete_table(bq_table, not_found_ok=not_found_ok)
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not drop table <{table.table_id}>. Error: {err}'
+        msg = f'Could not drop table <{bq_table.table_id}>. Error: {err}'
         _LOGGER.critical(msg)
         raise ValueError(msg) from err
 
@@ -376,12 +378,13 @@ def list_all_tables_with_filter(
     :return:
     """
     # validate input
-    project_id = _get_stripped_str_arg('project_id', project_id, True)
-    location = _get_stripped_str_arg('location', location, True)
+    project_id = _stripped_str_arg('project_id', project_id, True)
+    location = _stripped_str_arg('location', location, True)
     if not callable(filter_fn):
         filter_fn = _FALLBACK_FILTER_FN
     # logic
-    yield _list_all_tables_with_filter(project_id, location, filter_fn)
+    for table_fqn_id in _list_all_tables_with_filter(project_id, location, filter_fn):
+        yield table_fqn_id
 
 
 def _list_all_tables_with_filter(
@@ -445,4 +448,4 @@ def cross_region_dataset_copy() -> None:
             }'
     :return:
     """
-    pass
+    raise NotImplementedError('Missing use case')

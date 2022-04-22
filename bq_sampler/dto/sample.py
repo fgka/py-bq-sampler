@@ -273,7 +273,9 @@ class TableReference(attrs_defaults.HasFromDict):  # pylint: disable=too-few-pub
                 f'Argument must be in the format: <PROJECT_ID>.<DATASET_ID>.<TABLE_ID>. '
                 f'Got: {value}'
             )
-        return cls(project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location)
+        return cls(
+            project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
+        )
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)

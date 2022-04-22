@@ -11,10 +11,11 @@ import pytest
 
 import attrs
 
+from bq_sampler import const
 from bq_sampler.dto import attrs_defaults
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasIsEmpty(attrs_defaults.HasIsEmpty):
     field_int: int = attrs.field(default=None)
     field_str: str = attrs.field(default=None)
@@ -48,7 +49,7 @@ class TestHasIsEmpty:
         assert not obj.is_empty()
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasPatchWith_Substitution(attrs_defaults.HasPatchWith):
     field_int: int = attrs.field(default=None)
     field_str: str = attrs.field(default=None)
@@ -96,7 +97,7 @@ class TestHasPatchWith_Substitution:
         assert result == _TEST_MY_HAS_PATCH_WITH_SUBSTITUTION
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasPatchWith_Merge(attrs_defaults.HasPatchWith):
     field_int: int = attrs.field(default=None)
     field_with_patch: attrs_defaults.HasPatchWith = attrs.field(default=None)
@@ -177,7 +178,7 @@ class TestHasPatchWith_Merge:
         assert result.field_with_patch.field_with_patch == obj.field_with_patch.field_with_patch
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasFromDictA(attrs_defaults.HasFromDict):
     field_int: int = attrs.field(default=None)
     field_str: str = attrs.field(default=None)
@@ -186,7 +187,7 @@ class _MyHasFromDictA(attrs_defaults.HasFromDict):
 _TEST_MY_HAS_FROM_DICT_A = _MyHasFromDictA(field_int=41, field_str='TEST_CASE')
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasFromDictB(attrs_defaults.HasFromDict):
     field_int: int = attrs.field(default=None)
     field_a: _MyHasFromDictA = attrs.field(default=None)
@@ -232,13 +233,13 @@ class TestHasFromDict:
             assert result.field_a == field_a
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasFromJsonStringA(attrs_defaults.HasFromJsonString):
     field_str: str = attrs.field(default=None)
     field_float: float = attrs.field(default=None)
 
 
-@attrs.define(**attrs_defaults.ATTRS_DEFAULTS)
+@attrs.define(**const.ATTRS_DEFAULTS)
 class _MyHasFromJsonStringB(attrs_defaults.HasFromJsonString):
     field_int: int = attrs.field(default=None)
     field_a: _MyHasFromJsonStringA = attrs.field(default=None)

@@ -60,12 +60,12 @@ class TestPolicy:
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
 _TEST_DATASET_ID: str = 'TEST_DATASET_ID'
 _TEST_TABLE_ID: str = 'TEST_TABLE_ID'
-_TEST_REGION: str = 'TEST_REGION'
+_TEST_LOCATION: str = 'TEST_REGION'
 _TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
     project_id=_TEST_PROJECT_ID,
     dataset_id=_TEST_DATASET_ID,
     table_id=_TEST_TABLE_ID,
-    region=_TEST_REGION,
+    location=_TEST_LOCATION,
 )
 _TEST_POLICY: policy.Policy = policy.Policy(limit=_TEST_SAMPLE_SIZE, default_sample=_TEST_SAMPLE)
 
