@@ -49,6 +49,8 @@ def query_job_result(
     location: Optional[str] = None,
 ) -> bigquery.table.RowIterator:
     """
+    Forces the py:class:`bigquery.job.query.QueryJob` to get the results
+        (works as a synchronization mechanism too).
 
     :param query:
     :param job_config:
@@ -72,6 +74,7 @@ def drop_all_tables_by_labels(
     *, project_id: str, location: Optional[str] = None, labels: Optional[Dict[str, str]] = None
 ) -> None:
     """
+    Will list all tables and remove all that matches the label criteria.
 
     :param project_id:
     :param location:

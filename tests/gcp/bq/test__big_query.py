@@ -5,7 +5,7 @@
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from google.cloud import bigquery
 from google.api_core import page_iterator
@@ -26,7 +26,7 @@ _TEST_TABLE_ID_ONLY: str = const.BQ_TABLE_FQN_ID_SEP.join(
 _TEST_TABLE_FQN_ID: str = f'{_TEST_TABLE_ID_ONLY}{const.BQ_TABLE_FQN_LOCATION_SEP}{_TEST_LOCATION}'
 
 
-class _StubClient:
+class _StubClient:  # pylint: disable=too-many-instance-attributes,too-many-locals
     def __init__(
         self,
         *,
@@ -79,42 +79,50 @@ class _StubClient:
             assert kwargs.get('job_config') == self._job_config
         return self._query_job
 
-    def create_dataset(self, *args, **kwargs) -> bigquery.Dataset:
+    def create_dataset(  # pylint: disable=unused-argument
+        self, *args, **kwargs
+    ) -> bigquery.Dataset:
         if self._create_dataset_exception is not None:
             raise self._create_dataset_exception
         return args[0]
 
-    def update_dataset(self, *args, **kwargs) -> bigquery.Dataset:
+    def update_dataset(  # pylint: disable=unused-argument
+        self, *args, **kwargs
+    ) -> bigquery.Dataset:
         if self._update_dataset_exception is not None:
             raise self._update_dataset_exception
         assert 'labels' in args[1]
         return args[0]
 
-    def create_table(self, *args, **kwargs) -> bigquery.Table:
+    def create_table(self, *args, **kwargs) -> bigquery.Table:  # pylint: disable=unused-argument
         if self._create_table_exception is not None:
             raise self._create_table_exception
         return args[0]
 
-    def update_table(self, *args, **kwargs) -> bigquery.Table:
+    def update_table(self, *args, **kwargs) -> bigquery.Table:  # pylint: disable=unused-argument
         if self._update_table_exception is not None:
             raise self._update_table_exception
         assert 'labels' in args[1]
         assert 'schema' in args[1]
         return args[0]
 
-    def delete_table(self, *args, **kwargs) -> None:
+    def delete_table(self, *args, **kwargs) -> None:  # pylint: disable=unused-argument
         if self._delete_table_exception is not None:
             raise self._delete_table_exception
         assert args[0]
 
-    def list_datasets(self, *args, **kwargs) -> page_iterator.Iterator:
+    def list_datasets(  # pylint: disable=unused-argument
+        self, *args, **kwargs
+    ) -> page_iterator.Iterator:
         if self._list_datasets_exception is not None:
             raise self._list_datasets_exception
         assert kwargs.get('include_all')
         for ds in self._list_datasets:
             yield _StubDataset(dataset_id=ds, project=self.project)
 
-    def list_tables(self, *args, **kwargs) -> page_iterator.Iterator:
+    def list_tables(  # pylint: disable=unused-argument
+        self, *args, **kwargs
+    ) -> page_iterator.Iterator:
         if self._list_tables_exception is not None:
             raise self._list_tables_exception
         for t in self._list_tables:
@@ -144,12 +152,18 @@ class _StubQueryJob:
 
 
 class _StubDataset:
-    def __init__(self, *, bq_table: Optional[bigquery.Table] = None, dataset_id: Optional[str] = None, project: Optional[str] = None):
+    def __init__(
+        self,
+        *,
+        bq_table: Optional[bigquery.Table] = None,
+        dataset_id: Optional[str] = None,
+        project: Optional[str] = None,
+    ):
         self._table = bq_table
         self.dataset_id = dataset_id
         self.project = project
 
-    def table(self, *args, **kwargs) -> bigquery.Table:
+    def table(self, *args, **kwargs) -> bigquery.Table:  # pylint: disable=unused-argument
         assert args[0] == self._table.table_id
         return self._table
 
@@ -178,7 +192,7 @@ def _mock_client(
     project_id: Optional[str] = None,
     location: Optional[str] = None,
 ) -> None:
-    def mocked_client(*args, **kwargs) -> bigquery.Client:
+    def mocked_client(*args, **kwargs) -> bigquery.Client:  # pylint: disable=unused-argument
         if project_id is not None:
             assert args[0] == project_id
             client.project = project_id
@@ -305,13 +319,14 @@ def test_list_all_tables_with_filter_ok_default_filter(monkeypatch):
     expected = set()
     for ds in datasets:
         for t in tables:
-            table_id = const.BQ_TABLE_FQN_ID_SEP.join(
-                        [_TEST_PROJECT_ID, ds, t])
+            table_id = const.BQ_TABLE_FQN_ID_SEP.join([_TEST_PROJECT_ID, ds, t])
             expected.add(f'{table_id}{const.BQ_TABLE_FQN_LOCATION_SEP}{_TEST_LOCATION}')
     client = _StubClient(list_datasets=datasets, list_tables=tables)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
+    result = _big_query.list_all_tables_with_filter(
+        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
+    )
     # Then
     assert result
     s_result = set()
@@ -328,7 +343,9 @@ def test_list_all_tables_with_filter_ok_exclude_all_filter(monkeypatch):
     client = _StubClient(list_datasets=datasets, list_tables=tables)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, filter_fn=lambda _: False)
+    result = _big_query.list_all_tables_with_filter(
+        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, filter_fn=lambda _: False
+    )
     # Then
     assert result
     s_result = set()
@@ -351,7 +368,9 @@ def test_list_all_tables_with_filter_nok_client_fails(monkeypatch, client_kwargs
     client = _StubClient(list_datasets=datasets, list_tables=tables, **client_kwargs)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
+    result = _big_query.list_all_tables_with_filter(
+        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
+    )
     # Then
     with pytest.raises(ValueError):
         next(result)

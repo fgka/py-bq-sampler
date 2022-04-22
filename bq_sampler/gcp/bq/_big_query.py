@@ -203,6 +203,7 @@ def create_table(
     drop_table_before: Optional[bool] = True,
 ) -> None:
     """
+    Using the full-qualified ID creates a table.
 
     :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :param schema:
@@ -338,6 +339,7 @@ def _create_table(  # pylint: disable=too-many-arguments
 
 def drop_table(*, table_fqn_id: str, not_found_ok: Optional[bool] = True) -> None:
     """
+    Will drop the specified table.
 
     :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :param not_found_ok:
@@ -371,6 +373,9 @@ def list_all_tables_with_filter(
     filter_fn: Optional[Callable[[bigquery.table.TableListItem], bool]] = None,
 ) -> Generator[str, None, None]:
     """
+    Lists all tables matching the label criteria, if given.
+    Notice that it actually go over all datasets and tables and
+        filters out after the API has been called.
 
     :param project_id:
     :param location:

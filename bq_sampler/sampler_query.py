@@ -255,6 +255,8 @@ def create_table_with_random_sample(
     recreate_table: Optional[bool] = True,
 ) -> None:
     """
+    Will create the target table and put the source table sample directly into it.
+    See :py:func:`random_sample` for details in the sampling strategy.
 
     :param source_table_ref:
     :param target_table_ref:
@@ -342,6 +344,8 @@ def create_table_with_sorted_sample(
     recreate_table: Optional[bool] = True,
 ) -> None:
     """
+    Will create the target table and put the source table sample directly into it.
+    See :py:func:`sorted_sample` for details in the sampling strategy.
 
     :param source_table_ref:
     :param target_table_ref:
