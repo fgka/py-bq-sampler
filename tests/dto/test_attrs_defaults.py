@@ -5,11 +5,12 @@
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
 
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 import pytest
 
 import attrs
+import deepdiff
 
 from bq_sampler import const
 from bq_sampler.dto import attrs_defaults
@@ -194,6 +195,35 @@ class _MyHasFromDictB(attrs_defaults.HasFromDict):
 
 
 class TestHasFromDict:
+    def test_as_dict_ok(self):
+        # Given
+        obj = _MyHasFromDictA(field_int=17, field_str='test')
+        # When
+        result = obj.as_dict()
+        # Then
+        diff = deepdiff.DeepDiff(result, attrs.asdict(obj))
+        assert not diff, diff
+
+    @pytest.mark.parametrize('overwrite', [{}, {'not_a_field': 19}])
+    def test_clone_ok_no_overwrite(self, overwrite: Optional[Dict[str, Any]]):
+        # Given
+        obj = _MyHasFromDictA(field_int=17, field_str='test')
+        # When
+        result = obj.clone(**overwrite)
+        # Then
+        assert obj == result
+
+    def test_clone_ok_with_overwrite(self):
+        # Given
+        overwrite = {'field_int': 31}
+        obj = _MyHasFromDictA(field_int=17, field_str='test')
+        # When
+        result = obj.clone(**overwrite)
+        # Then
+        assert obj != result
+        assert obj.field_str == result.field_str
+        assert result.field_int == overwrite.get('field_int')
+
     @pytest.mark.parametrize(
         'field_int,field_str',
         [

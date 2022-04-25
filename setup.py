@@ -44,6 +44,7 @@ DEBUG_REQUIRED = [
 
 CODE_QUALITY_REQUIRED = [
     'black>=20.8b1',
+    'deepdiff>=5.8.0',
     'mock>=3.0.5',
     'nose>=1.3.7',
     'pudb>=2019.1',

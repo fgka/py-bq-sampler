@@ -10,7 +10,7 @@ List all project IDs that should be sampled. It assumes the following structure 
 
 """
 import logging
-from typing import Any, Callable, Generator, Optional, Tuple
+from typing import Any, Callable, Generator, Tuple
 
 from bq_sampler import const
 from bq_sampler.gcp import gcs
@@ -161,7 +161,7 @@ def _sample_request(bucket_name: str, request_filename: str) -> sample.Sample:
 
 
 def sample_request_from_policy(
-    bucket_name: str, table_policy: policy.TablePolicy, sample_project_id: Optional[str] = None
+    bucket_name: str, table_policy: policy.TablePolicy
 ) -> sample.TableSample:
     """
     For a given :py:class:`policy.TablePolicy` create a corresponding
@@ -175,23 +175,14 @@ def sample_request_from_policy(
     # get overwritten request with policy default sample
     req_sample = _sample_request(bucket_name, _json_object_path(table_policy.table_reference))
     effective_sample = _overwrite_request(req_sample, table_policy.policy)
-    table_reference = _table_reference(table_policy.table_reference, sample_project_id)
-    result = sample.TableSample(table_reference=table_reference, sample=effective_sample)
+    result = sample.TableSample(
+        table_reference=table_policy.table_reference, sample=effective_sample
+    )
     return result
 
 
 def _overwrite_request(request: sample.Sample, request_policy: policy.Policy) -> sample.Sample:
     return request.patch_with(request_policy.default_sample)
-
-
-def _table_reference(source: sample.TableReference, sample_project_id: Optional[str] = None):
-    # TODO test
-    result = source
-    if isinstance(sample_project_id, str) and sample_project_id.strip():
-        table_reference_dict = source.to_dict()
-        table_reference_dict['project_id'] = sample_project_id.strip()
-        result = sample.TableReference.from_dict(table_reference_dict)
-    return result
 
 
 def _json_object_path(table_reference: sample.TableReference) -> str:

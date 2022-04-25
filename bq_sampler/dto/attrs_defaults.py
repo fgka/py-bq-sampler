@@ -131,6 +131,29 @@ class HasFromDict(HasPatchWith):
     To add :py:meth:`from_dict` to children.
     """
 
+    def as_dict(self) -> Dict[str, str]:
+        """
+        Simple wrapper for::
+            attrs.asdict(self)
+
+        :return:
+        """
+        return attrs.asdict(self)
+
+    def clone(self, **overwrite) -> Any:
+        """
+        Will create a new instance of the same type and apply overwrites, if given.
+
+        :param overwrite:
+        :return:
+        """
+        kwargs = self.as_dict()
+        if isinstance(overwrite, dict):
+            for key, val in overwrite.items():
+                if key in kwargs:
+                    kwargs[key] = val
+        return self.__class__.from_dict(kwargs)
+
     @classmethod
     def from_dict(cls, value: Dict[str, Any]) -> Any:
         """
@@ -226,15 +249,6 @@ class HasFromJsonString(HasFromDict):
             _LOGGER.critical(msg)
             raise ValueError(msg) from err
         return result
-
-    def as_dict(self) -> Dict[str, str]:
-        """
-        Simple wrapper for::
-            attrs.asdict(self)
-
-        :return:
-        """
-        return attrs.asdict(self)
 
 
 class EnumWithFromStrIgnoreCase(enum.Enum):

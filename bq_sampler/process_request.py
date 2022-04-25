@@ -14,6 +14,7 @@ from bq_sampler import sampler_bucket, sampler_query
 
 _LOGGER = logging.getLogger(__name__)
 
+_BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'
@@ -23,11 +24,16 @@ _PUBSUB_ERROR_TOPIC_ENV_VAR: str = 'ERROR_TOPIC_NAME'
 
 class _GeneralConfig:
     def __init__(self):
+        self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
         self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR)
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_REQUEST_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
+
+    @property
+    def target_project_id(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._target_project_id
 
     @property
     def policy_bucket(self) -> str:  # pylint: disable=missing-function-docstring
