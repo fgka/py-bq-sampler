@@ -52,9 +52,9 @@ DEFAULT_CREATE_TABLE_LABELS: Dict[str, str] = {
 Default GCP resource label to be applied table created here.
 """
 
-###################
-#  Event Request  #
-###################
+#############
+#  Command  #
+#############
 
 REQUEST_TYPE_START = 'START'
 REQUEST_TYPE_SAMPLE_START = 'SAMPLE_START'

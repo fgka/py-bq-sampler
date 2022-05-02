@@ -8,7 +8,7 @@ import time
 
 import cachetools
 
-from bq_sampler.entity import request, table, policy
+from bq_sampler.entity import command, table, policy
 from bq_sampler import sampler_bucket, sampler_query
 from bq_sampler.gcp import pubsub
 
@@ -20,6 +20,9 @@ _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'
 _PUBSUB_REQUEST_TOPIC_ENV_VAR: str = 'REQUEST_TOPIC_NAME'
 _PUBSUB_ERROR_TOPIC_ENV_VAR: str = 'ERROR_TOPIC_NAME'
+
+_PUBSUB_ERROR_CMD_ENTRY: str = 'command'
+_PUBSUB_ERROR_MSG_ENTRY: str = 'error'
 
 
 class _GeneralConfig:
@@ -56,50 +59,48 @@ class _GeneralConfig:
         return self._pubsub_error
 
 
-def process(event_request: request.EventRequest) -> None:
+def process(cmd: command.CommandBase) -> None:
     """
-    Single entry point to process requests coming from Pub/Sub.
+    Single entry point to process commands coming from Pub/Sub.
 
-    :param event_request:
-    :param project_id:
+    :param cmd:
     :return:
     """
-    _LOGGER.debug('Processing request <%s>', event_request)
+    _LOGGER.debug('Processing command <%s>', cmd)
     try:
-        _process(event_request)
-        _LOGGER.debug('Processed request <%s>', event_request)
+        _process(cmd)
+        _LOGGER.debug('Processed command <%s>', cmd)
     except Exception as err:
         error_data = {
-            'event': event_request.as_dict(),
-            'error': str(err),
+            _PUBSUB_ERROR_CMD_ENTRY: cmd.as_dict(),
+            _PUBSUB_ERROR_MSG_ENTRY: str(err),
         }
         pubsub.publish(error_data, _general_config().pubsub_error)
-        msg = f'Could not process event: <{event_request}>. Error: {err}'
+        msg = f'Could not process command: <{cmd}>. Error: {err}'
         _LOGGER.critical(msg)
         raise RuntimeError(msg) from err
 
 
-def _process(event_request: request.EventRequest) -> None:
-    if event_request.type == request.RequestType.START.value:
-        _process_start(event_request)
-    elif event_request.type == request.RequestType.SAMPLE_START.value:
-        _process_sample_start(event_request)
-    elif event_request.type == request.RequestType.SAMPLE_DONE.value:
-        _process_sample_done(event_request)
+def _process(cmd: command.CommandBase) -> None:
+    if cmd.type == command.CommandType.START.value:
+        _process_start(cmd)
+    elif cmd.type == command.CommandType.SAMPLE_START.value:
+        _process_sample_start(cmd)
+    elif cmd.type == command.CommandType.SAMPLE_DONE.value:
+        _process_sample_done(cmd)
     else:
-        raise ValueError(f'Event request type <{event_request.type}> cannot be processed')
+        raise ValueError(f'Command type <{cmd.type}> cannot be processed')
 
 
-def _process_start(event_request: request.EventRequestStart) -> None:
+def _process_start(cmd: command.CommandStart) -> None:
     """
     Will inspect the policy and requests buckets,
         apply compliance,
         and issue a sampling request for all targeted tables.
-    It will also generate a :py:class:`request.EventRequestSampleStart` for each one
+    It will also generate a :py:class:`command.CommandSampleStart` for each one
         and send it out into the Pub/Sub topic.
 
-    :param event_request:
-    :param project_id:
+    :param cmd:
     :return:
     """
     _LOGGER.debug('Retrieving all policies from bucket <%s>', _general_config().policy_bucket)
@@ -119,9 +120,9 @@ def _process_start(event_request: request.EventRequestStart) -> None:
         # compliance enforcement
         table_sample = _compliant_sample_request(table_policy, table_sample)
         # create sample request event
-        start_sample_req = _create_sample_start_request(event_request, table_policy, table_sample)
+        start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
         # send request out
-        _publish_event_request_to_pubsub(start_sample_req)
+        _publish_cmd_to_pubsub(start_sample_req)
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
@@ -136,47 +137,47 @@ def _compliant_sample_request(
     return table_policy.compliant_sample(table_sample, row_count)
 
 
-def _create_sample_start_request(
-    event_request: request.EventRequestStart,
+def _create_sample_start_cmd(
+    cmd: command.CommandStart,
     table_policy: policy.TablePolicy,
     table_sample: table.TableSample,
-) -> request.EventRequestSampleStart:
+) -> command.CommandSampleStart:
     source_table = table_policy.table_reference
     kwargs = {
-        request.EventRequestSampleStart.type.__name__: request.RequestType.SAMPLE_START.value,
-        request.EventRequestSampleStart.request_timestamp.__name__: event_request.request_timestamp,
-        request.EventRequestSampleStart.sample_request.__name__: table_sample,
-        request.EventRequestSampleStart.target_table.__name__: source_table.clone(
+        command.CommandSampleStart.type.__name__: command.CommandType.SAMPLE_START.value,
+        command.CommandSampleStart.timestamp.__name__: cmd.timestamp,
+        command.CommandSampleStart.sample_request.__name__: table_sample,
+        command.CommandSampleStart.target_table.__name__: source_table.clone(
             project_id=_general_config().target_project_id
         ),
     }
-    return request.EventRequestSampleStart(**kwargs)
+    return command.CommandSampleStart(**kwargs)
 
 
-def _publish_event_request_to_pubsub(event_request: request.EventRequest) -> None:
+def _publish_cmd_to_pubsub(cmd: command.CommandBase) -> None:
     topic = _general_config().pubsub_request
-    _LOGGER.debug('Sending event request <%s> to topic <%s>', event_request, topic)
-    data = event_request.as_dict()
+    _LOGGER.debug('Sending event request <%s> to topic <%s>', cmd, topic)
+    data = cmd.as_dict()
     pubsub.publish(data, topic)
 
 
-def _process_sample_start(event_request: request.EventRequestSampleStart) -> None:
+def _process_sample_start(cmd: command.CommandSampleStart) -> None:
     """
     Given a compliant sample request, issue the BigQuery corresponding sampling request.
     When finished, will push a Pub/Sub message containing the
-        :py:class:`request.EventRequestSampleDone` request.
+        :py:class:`command.CommandSampleDone` request.
 
-    :param event_request:
+    :param cmd:
     :return:
     """
-    _LOGGER.info('Issuing sample request <%s>', event_request)
+    _LOGGER.info('Issuing sample command <%s>', cmd)
     start_timestamp = int(time.time())
     error_message = ''
-    sample_type = table.SortType.from_str(event_request.sample_request.sample.spec.type)
+    sample_type = table.SortType.from_str(cmd.sample_request.sample.spec.type)
     kwargs = dict(
-        source_table_ref=event_request.sample_request.table_reference,
-        target_table_ref=event_request.target_table,
-        amount=event_request.sample_request.sample.size.count,
+        source_table_ref=cmd.sample_request.table_reference,
+        target_table_ref=cmd.target_table,
+        amount=cmd.sample_request.sample.size.count,
         recreate_table=True,
     )
     if sample_type == table.SortType.RANDOM:
@@ -184,46 +185,46 @@ def _process_sample_start(event_request: request.EventRequestSampleStart) -> Non
     elif sample_type == table.SortType.SORTED:
         kwargs.update(
             dict(
-                column=event_request.sample_request.sample.spec.properties.by,
-                order=event_request.sample_request.sample.spec.properties.direction,
+                column=cmd.sample_request.sample.spec.properties.by,
+                order=cmd.sample_request.sample.spec.properties.direction,
             )
         )
         sampler_query.create_table_with_sorted_sample(**kwargs)  # pylint: disable=missing-kwoa
     else:
         raise ValueError(
-            f'Cannot process sample request of type <{sample_type}> in <{event_request}>'
+            f'Cannot process sample request of type <{sample_type}> in <{cmd}>'
         )
     end_timestamp = int(time.time())
-    sample_done = _create_sample_done_request(
-        event_request, start_timestamp, end_timestamp, error_message
+    sample_done = _create_sample_done_cmd(
+        cmd, start_timestamp, end_timestamp, error_message
     )
     pubsub.publish(sample_done.as_dict(), _general_config().pubsub_request)
 
 
-def _create_sample_done_request(
-    event_request: request.EventRequestSampleStart,
+def _create_sample_done_cmd(
+    cmd: command.CommandSampleStart,
     start_timestamp: int,
     end_timestamp: int,
     error_message: str,
-) -> request.EventRequestSampleDone:
+) -> command.CommandSampleDone:
     kwargs = {
-        request.EventRequestSampleDone.type.__name__: request.RequestType.SAMPLE_DONE.value,
-        request.EventRequestSampleDone.request_timestamp.__name__: event_request.request_timestamp,
-        request.EventRequestSampleDone.sample_request.__name__: event_request.sample_request,
-        request.EventRequestSampleDone.target_table.__name__: event_request.target_table,
-        request.EventRequestSampleDone.start_timestamp.__name__: start_timestamp,
-        request.EventRequestSampleDone.end_timestamp.__name__: end_timestamp,
-        request.EventRequestSampleDone.error_message.__name__: error_message,
+        command.CommandSampleDone.type.__name__: command.CommandType.SAMPLE_DONE.value,
+        command.CommandSampleDone.timestamp.__name__: cmd.timestamp,
+        command.CommandSampleDone.sample_request.__name__: cmd.sample_request,
+        command.CommandSampleDone.target_table.__name__: cmd.target_table,
+        command.CommandSampleDone.start_timestamp.__name__: start_timestamp,
+        command.CommandSampleDone.end_timestamp.__name__: end_timestamp,
+        command.CommandSampleDone.error_message.__name__: error_message,
     }
-    return request.EventRequestSampleDone(**kwargs)
+    return command.CommandSampleDone(**kwargs)
 
 
-def _process_sample_done(event_request: request.EventRequestSampleDone) -> None:
+def _process_sample_done(cmd: command.CommandSampleDone) -> None:
     """
     Collect the signal that a given sampling request has finished, logging it.
     If there is any error message, pushes the message into the error Pub/Sub topic.
 
-    :param event_request:
+    :param cmd:
     :return:
     """
-    _LOGGER.info('Completed sample for request <%s>', event_request)
+    _LOGGER.info('Completed sample for command <%s>', cmd)

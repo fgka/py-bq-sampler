@@ -11,8 +11,7 @@ from bq_sampler.entity import policy
 from bq_sampler import const
 from bq_sampler import sampler_bucket
 
-from tests import gcs_on_disk
-
+from tests.gcp import gcs_on_disk
 
 _GENERAL_POLICY_PATH: str = 'default_policy.json'
 

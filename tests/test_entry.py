@@ -10,7 +10,7 @@ from typing import Any
 
 from bq_sampler import entry
 
-from tests import request_test_data
+from tests.entity import command_test_data
 
 
 class _StubContext:
@@ -18,18 +18,18 @@ class _StubContext:
         self.timestamp = timestamp
 
 
-def test__from_pubsub_to_event_request_ok():
+def test__from_pubsub_to_cmd_ok():
     # Given
-    event_request = request_test_data.TEST_EVENT_REQUEST_START
+    cmd = command_test_data.TEST_COMMAND_START
     timestamp = 123
     context = _StubContext(timestamp=timestamp)
-    event = _create_event_str(event_request.as_dict())
+    event = _create_event_str(cmd.as_dict())
     # When
-    result = entry._from_pubsub_to_event_request(event, context)
+    result = entry._from_pubsub_to_cmd(event, context)
     # Then
-    assert isinstance(result, event_request.__class__)
-    assert result.type == event_request.type
-    assert result.request_timestamp == timestamp
+    assert isinstance(result, cmd.__class__)
+    assert result.type == cmd.type
+    assert result.timestamp == timestamp
 
 
 def _create_event_str(data: Any) -> str:

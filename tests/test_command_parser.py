@@ -6,28 +6,28 @@
 # type: ignore
 import pytest
 
-from bq_sampler import request_parser
-from bq_sampler.entity import request
+from bq_sampler import command_parser
+from bq_sampler.entity import command
 
-from tests import request_test_data
+from tests.entity import command_test_data
 
 
 @pytest.mark.parametrize(
     'value',
     [
-        request_test_data.TEST_EVENT_REQUEST_START,
-        request_test_data.TEST_EVENT_REQUEST_SAMPLE_START,
-        request_test_data.TEST_EVENT_REQUEST_SAMPLE_DONE,
+        command_test_data.TEST_COMMAND_START,
+        command_test_data.TEST_COMMAND_SAMPLE_START,
+        command_test_data.TEST_COMMAND_SAMPLE_DONE,
     ],
 )
-def test_to_event_request_ok(value: request.EventRequest):
+def test_to_command_ok(value: command.CommandBase):
     # Given
-    request_timestamp = 31
+    timestamp = 31
     # When
-    result = request_parser.to_event_request(value.as_dict(), request_timestamp)
+    result = command_parser.to_command(value.as_dict(), timestamp)
     # Then
     for key in result.as_dict():
-        if key == 'request_timestamp':
-            assert result.request_timestamp == request_timestamp
+        if key == command.CommandBase.timestamp.__name__:
+            assert result.timestamp == timestamp
         else:
             assert getattr(value, key) == getattr(result, key)

@@ -3,7 +3,7 @@
 Exposes all functionality related to BigQuery.
 """
 
-from bq_sampler.gcp.bq._big_query import (
+from bq_sampler.gcp.bq._bq_base import (
     create_table,
     cross_region_dataset_copy,
     drop_table,

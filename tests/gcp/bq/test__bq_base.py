@@ -13,7 +13,7 @@ from google.api_core import page_iterator
 import pytest
 
 from bq_sampler import const
-from bq_sampler.gcp.bq import _big_query
+from bq_sampler.gcp.bq import _bq_base
 
 
 _TEST_PROJECT_ID: str = 'test_project_id_a'
@@ -180,7 +180,7 @@ def test_table_ok(monkeypatch):
     client = _StubClient(bq_table=expected)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.table(table_fqn_id=_TEST_TABLE_FQN_ID)
+    result = _bq_base.table(table_fqn_id=_TEST_TABLE_FQN_ID)
     # Then
     assert result == expected
 
@@ -200,7 +200,7 @@ def _mock_client(
             assert args[1] == location
         return client
 
-    monkeypatch.setattr(_big_query, '_client', mocked_client)
+    monkeypatch.setattr(_bq_base, '_client', mocked_client)
 
 
 def test_table_nok(monkeypatch):
@@ -209,7 +209,7 @@ def test_table_nok(monkeypatch):
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When/Then
     with pytest.raises(ValueError):
-        _big_query.table(table_fqn_id=_TEST_TABLE_FQN_ID)
+        _bq_base.table(table_fqn_id=_TEST_TABLE_FQN_ID)
 
 
 _TEST_QUERY: str = 'TEST_QUERY'
@@ -234,7 +234,7 @@ def test_query_job_ok(monkeypatch):
     client = _StubClient(query_job=expected, query=query, job_config=job_config)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.query_job(
+    result = _bq_base.query_job(
         query=query, job_config=job_config, project_id=project_id, location=location
     )
     # Then
@@ -252,7 +252,7 @@ def test_query_job_nok(monkeypatch):
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When/Then
     with pytest.raises(RuntimeError):
-        _big_query.query_job(
+        _bq_base.query_job(
             query=query, job_config=job_config, project_id=project_id, location=location
         )
 
@@ -275,7 +275,7 @@ def test_create_table_ok(monkeypatch):
     client = _StubClient()
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When/Then
-    _big_query.create_table(
+    _bq_base.create_table(
         table_fqn_id=table_fqn_id, schema=schema, labels=labels, drop_table_before=True
     )
 
@@ -295,7 +295,7 @@ def test_create_table_nok_client_fails(monkeypatch, client_kwargs: Dict[str, Any
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When/Then
     with pytest.raises(ValueError):
-        _big_query.create_table(
+        _bq_base.create_table(
             table_fqn_id=_TEST_TABLE_FQN_ID,
             schema=_TEST_SCHEMA,
             labels=_TEST_LABELS,
@@ -309,7 +309,7 @@ def test_drop_table_ok(monkeypatch, not_found_ok: bool):
     client = _StubClient()
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    _big_query.drop_table(table_fqn_id=_TEST_TABLE_FQN_ID, not_found_ok=not_found_ok)
+    _bq_base.drop_table(table_fqn_id=_TEST_TABLE_FQN_ID, not_found_ok=not_found_ok)
 
 
 def test_list_all_tables_with_filter_ok_default_filter(monkeypatch):
@@ -324,7 +324,7 @@ def test_list_all_tables_with_filter_ok_default_filter(monkeypatch):
     client = _StubClient(list_datasets=datasets, list_tables=tables)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(
+    result = _bq_base.list_all_tables_with_filter(
         project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
     )
     # Then
@@ -343,7 +343,7 @@ def test_list_all_tables_with_filter_ok_exclude_all_filter(monkeypatch):
     client = _StubClient(list_datasets=datasets, list_tables=tables)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(
+    result = _bq_base.list_all_tables_with_filter(
         project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, filter_fn=lambda _: False
     )
     # Then
@@ -368,7 +368,7 @@ def test_list_all_tables_with_filter_nok_client_fails(monkeypatch, client_kwargs
     client = _StubClient(list_datasets=datasets, list_tables=tables, **client_kwargs)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _big_query.list_all_tables_with_filter(
+    result = _bq_base.list_all_tables_with_filter(
         project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
     )
     # Then

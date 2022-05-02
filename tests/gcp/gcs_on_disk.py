@@ -11,7 +11,7 @@ from typing import Any, Dict, Generator
 POLICY_BUCKET: str = 'policy_bucket'
 REQUEST_BUCKET: str = 'request_bucket'
 
-_TEST_DATA_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.joinpath('test_data')
+_TEST_DATA_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.parent.joinpath('test_data')
 
 
 def read_object(bucket_name: str, object_path: str) -> bytes:

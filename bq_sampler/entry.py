@@ -12,7 +12,7 @@ import os
 from typing import Any, Dict, Optional
 
 from bq_sampler import process_request
-from bq_sampler import request_parser
+from bq_sampler import command_parser
 from bq_sampler.gcp import pubsub
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,10 +26,6 @@ def handler(  # pylint: disable=unused-argument
     Args:
         event (dict): Event payload.
         context (google.cloud.functions.Context): Event context.
-        use_env_var_gcs_path (bool): if py:obj:`True` will overwrite object name resolution in GCS
-            to use environment variable defined path.
-        add_env_var_moveit_server (bool): if py:obj:`True` will force inclusion of
-            environment variable defined MOVEit server.
     Returns:
         The response text or any set of values that can be turned into a
         Response object using
@@ -60,14 +56,14 @@ def handler(  # pylint: disable=unused-argument
 
 
 def _handler(
-    event: Dict[str, Any],
+    cmd: Dict[str, Any],
     context: Any,
 ) -> None:
-    event_request = _from_pubsub_to_event_request(event, context)
-    process_request.process(event_request)
+    cmd = _from_pubsub_to_cmd(cmd, context)
+    process_request.process(cmd)
 
 
-def _from_pubsub_to_event_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    request_dict = pubsub.parse_json_data(event.get('data'))
+def _from_pubsub_to_cmd(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    cmd_dict = pubsub.parse_json_data(event.get('data'))
     timestamp: int = calendar.timegm(datetime.utcfromtimestamp(context.timestamp).utctimetuple())
-    return request_parser.to_event_request(request_dict, timestamp)
+    return command_parser.to_command(cmd_dict, timestamp)

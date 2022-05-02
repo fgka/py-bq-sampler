@@ -57,7 +57,6 @@ CODE_QUALITY_REQUIRED = [
     'pytest-pudb>=0.7.0',
     'pytest-pylint>=0.14.0',
     'pytest-xdist>=1.28.0',
-    'requests-mock>=1.9.3',
     'vulture>=1.0',
 ]
 

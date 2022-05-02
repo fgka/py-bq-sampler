@@ -46,14 +46,14 @@ def _mock_calls__big_query(
     def mocked_table(*args, **kwargs) -> bigquery.Table:  # pylint: disable=unused-argument
         return bq_table
 
-    monkeypatch.setattr(_bq_helper._big_query, 'table', mocked_table)
+    monkeypatch.setattr(_bq_helper._bq_base, 'table', mocked_table)
 
     def mocked_query_job(  # pylint: disable=unused-argument
         *args, **kwargs
     ) -> bigquery.job.query.QueryJob:
         return query_job
 
-    monkeypatch.setattr(_bq_helper._big_query, 'query_job', mocked_query_job)
+    monkeypatch.setattr(_bq_helper._bq_base, 'query_job', mocked_query_job)
 
     if not table_fqn_id_lst:
         table_fqn_id_lst = []
@@ -66,7 +66,7 @@ def _mock_calls__big_query(
             yield id
 
     monkeypatch.setattr(
-        _bq_helper._big_query, 'list_all_tables_with_filter', mocked_list_all_tables_with_filter
+        _bq_helper._bq_base, 'list_all_tables_with_filter', mocked_list_all_tables_with_filter
     )
 
     def mocked_drop_table(*args, **kwargs) -> None:  # pylint: disable=unused-argument
@@ -74,7 +74,7 @@ def _mock_calls__big_query(
         if drop_table_exception is not None:
             raise drop_table_exception
 
-    monkeypatch.setattr(_bq_helper._big_query, 'drop_table', mocked_drop_table)
+    monkeypatch.setattr(_bq_helper._bq_base, 'drop_table', mocked_drop_table)
 
 
 class _StubQueryJob:

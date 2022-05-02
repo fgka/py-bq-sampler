@@ -15,7 +15,7 @@ import cachetools
 from google.cloud import bigquery
 
 from bq_sampler import const
-from bq_sampler.gcp.bq import _big_query
+from bq_sampler.gcp.bq import _bq_base
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def row_count(*, table_fqn_id: str) -> int:
     :return:
     """
     _LOGGER.debug('Reading table size from :<%s>', table_fqn_id)
-    table = _big_query.table(table_fqn_id=table_fqn_id)
+    table = _bq_base.table(table_fqn_id=table_fqn_id)
     return table.num_rows
 
 
@@ -58,7 +58,7 @@ def query_job_result(
     :param location:
     :return:
     """
-    job = _big_query.query_job(
+    job = _bq_base.query_job(
         query=query, job_config=job_config, project_id=project_id, location=location
     )
     try:
@@ -87,7 +87,7 @@ def drop_all_tables_by_labels(
     _LOGGER.debug('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
     filter_fn = _has_table_labels_fn(labels)
     _drop_all_tables_in_iter(
-        _big_query.list_all_tables_with_filter(
+        _bq_base.list_all_tables_with_filter(
             project_id=project_id, location=location, filter_fn=filter_fn
         )
     )
@@ -116,7 +116,7 @@ def _drop_all_tables_in_iter(tables_to_drop_gen: Generator[str, None, None]) -> 
     last_error = None
     for table_fqn_id in tables_to_drop_gen:
         try:
-            _big_query.drop_table(table_fqn_id=table_fqn_id)
+            _bq_base.drop_table(table_fqn_id=table_fqn_id)
         except Exception as err:  # pylint: disable=broad-except
             msg = f'Cloud not drop table <{table_fqn_id}>. Error: {err}'
             _LOGGER.critical(msg)
