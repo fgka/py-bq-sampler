@@ -51,6 +51,67 @@ class TestPolicy:
         with pytest.raises(TypeError):
             policy.Policy(limit=limit, default_sample=default_sample)
 
+    def test__policy_count_limit_ok_count_wins(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        row_count = math.ceil(obj.limit.count * 100 / obj.limit.percentage) + 1
+        # When
+        result = obj._policy_count_limit(row_count)
+        # Then
+        assert result == obj.limit.count
+
+    def test__policy_count_limit_ok_percentage_wins(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        row_count = math.floor(obj.limit.count * 100 / obj.limit.percentage) - 1
+        # When
+        result = obj._policy_count_limit(row_count)
+        # Then
+        assert result < obj.limit.count
+
+    def test__sample_count_ok_count_wins(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        sample = sample_policy_data.TEST_SAMPLE
+        row_count = 0
+        # When
+        result = obj._sample_count(sample, row_count)
+        # Then
+        assert result == sample.size.count
+
+    def test__sample_count_ok_percentage_wins(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        sample = sample_policy_data.TEST_SAMPLE
+        row_count = math.ceil(obj.limit.count * 100 / obj.limit.percentage) + 100
+        # When
+        result = obj._sample_count(sample, row_count)
+        # Then
+        assert result > sample.size.count
+
+    def test__sample_copy_with_count_ok(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        sample = sample_policy_data.TEST_SAMPLE
+        sample_size = 100
+        # When
+        result = obj._sample_copy_with_count(sample, sample_size)
+        # Then
+        assert result.spec == sample.spec
+        assert result.size.percentage is None
+        assert result.size.count == sample_size
+
+    def test_compliant_sample_ok_happy_path(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        sample = sample_policy_data.TEST_SAMPLE
+        row_count: int = math.ceil(100 * obj.limit.count / obj.limit.percentage) + 1
+        # When
+        result = obj.compliant_sample(sample, row_count)
+        # Then
+        assert result.size.percentage is None
+        assert result.size.count == sample.size.count
+
 
 @pytest.mark.incremental
 class TestTablePolicy:
@@ -72,57 +133,6 @@ class TestTablePolicy:
     def test_ctor_nok_type(self, table_reference: Any, policy_arg: Any):
         with pytest.raises(TypeError):
             policy.TablePolicy(table_reference=table_reference, policy=policy_arg)
-
-    def test__policy_count_limit_ok_count_wins(self):
-        # Given
-        obj = sample_policy_data.TEST_TABLE_POLICY
-        row_count = math.ceil(obj.policy.limit.count * 100 / obj.policy.limit.percentage) + 1
-        # When
-        result = obj._policy_count_limit(row_count)
-        # Then
-        assert result == obj.policy.limit.count
-
-    def test__policy_count_limit_ok_percentage_wins(self):
-        # Given
-        obj = sample_policy_data.TEST_TABLE_POLICY
-        row_count = math.floor(obj.policy.limit.count * 100 / obj.policy.limit.percentage) - 1
-        # When
-        result = obj._policy_count_limit(row_count)
-        # Then
-        assert result < obj.policy.limit.count
-
-    def test__sample_count_ok_count_wins(self):
-        # Given
-        obj = sample_policy_data.TEST_TABLE_POLICY
-        table_sample = sample_policy_data.TEST_TABLE_SAMPLE
-        row_count = 0
-        # When
-        result = obj._sample_count(table_sample, row_count)
-        # Then
-        assert result == table_sample.sample.size.count
-
-    def test__sample_count_ok_percentage_wins(self):
-        # Given
-        obj = sample_policy_data.TEST_TABLE_POLICY
-        table_sample = sample_policy_data.TEST_TABLE_SAMPLE
-        row_count = math.ceil(obj.policy.limit.count * 100 / obj.policy.limit.percentage) + 100
-        # When
-        result = obj._sample_count(table_sample, row_count)
-        # Then
-        assert result > table_sample.sample.size.count
-
-    def test__sample_copy_with_count_ok(self):
-        # Given
-        obj = sample_policy_data.TEST_TABLE_POLICY
-        table_sample = sample_policy_data.TEST_TABLE_SAMPLE
-        sample_size = 100
-        # When
-        result = obj._sample_copy_with_count(table_sample, sample_size)
-        # Then
-        assert result.table_reference == table_sample.table_reference
-        assert result.sample.spec == table_sample.sample.spec
-        assert result.sample.size.percentage is None
-        assert result.sample.size.count == sample_size
 
     def test_compliant_sample_ok_happy_path(self):
         # Given

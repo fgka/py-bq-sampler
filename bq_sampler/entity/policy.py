@@ -38,9 +38,7 @@ class Policy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
 
     limit: table.SizeSpec = attrs.field(
         default=None,
-        validator=attrs.validators.optional(
-            validator=attrs.validators.instance_of(table.SizeSpec)
-        ),
+        validator=attrs.validators.optional(validator=attrs.validators.instance_of(table.SizeSpec)),
     )
     default_sample: table.Sample = attrs.field(
         default=None,
@@ -107,6 +105,60 @@ class Policy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
         """
         return False
 
+    def compliant_sample(self, sample: table.Sample, row_count: int) -> table.Sample:
+        """
+        Will apply the policy to the sample and return a compliant instance.
+
+        :param sample:
+        :param row_count:
+        :return:
+        """
+        # validate input
+        if not isinstance(sample, table.Sample):
+            raise TypeError(
+                f'Sample must be of type {table.Sample.__name__}.'
+                f' Got <{sample}>({type(sample)})'
+            )
+        if not isinstance(row_count, (int, float)) or row_count <= 0:
+            raise ValueError(
+                f'Row count must be an integer greater than 0. Got <{row_count}>({type(row_count)})'
+            )
+        # logic
+        policy_count_limit = self._policy_count_limit(row_count)
+        sample_count = self._sample_count(sample, row_count)
+        compliant_count = min(policy_count_limit, sample_count)
+        return self._sample_copy_with_count(sample, compliant_count)
+
+    def _policy_count_limit(self, row_count: int) -> int:
+        # row_count works because of min() in percentage
+        # and count or percentage must exist at all times
+        result = row_count
+        if self.limit.count is not None:
+            result = self.limit.count
+        if self.limit.percentage is not None:
+            limit_percent = math.floor(row_count * self.limit.percentage / 100)
+            result = min(limit_percent, result)
+        return result
+
+    @staticmethod
+    def _sample_count(sample: table.Sample, row_count: int) -> int:
+        # 0 works because of max() at percentage
+        # and count or percentage must exist at all times
+        result = 0
+        if sample.size.count is not None:
+            result = sample.size.count
+        if sample.size.percentage is not None:
+            limit_percent = math.ceil(row_count * sample.size.percentage / 100)
+            result = max(limit_percent, result)
+        return result
+
+    @staticmethod
+    def _sample_copy_with_count(sample: table.Sample, sample_size: int) -> table.Sample:
+        return table.Sample(
+            spec=sample.spec,
+            size=table.SizeSpec(count=sample_size),
+        )
+
 
 FALLBACK_GENERIC_POLICY: Policy = Policy(
     limit=table.SizeSpec(count=1),
@@ -147,52 +199,14 @@ class TablePolicy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-
                 f'Table sample must be of type {table.TableSample.__name__}.'
                 f' Got <{table_sample}>({type(table_sample)})'
             )
-        if not isinstance(row_count, (int, float)) or row_count <= 0:
-            raise ValueError(
-                f'Row count must be an integer greater than 0. Got <{row_count}>({type(row_count)})'
-            )
         if table_sample.table_reference != self.table_reference:
             raise ValueError(
                 f'Policy only applicable to table {self.table_reference}'
                 f' and sample is for table {table_sample.table_reference}'
             )
         # logic
-        policy_count_limit = self._policy_count_limit(row_count)
-        sample_count = self._sample_count(table_sample, row_count)
-        compliant_count = min(policy_count_limit, sample_count)
-        return self._sample_copy_with_count(table_sample, compliant_count)
-
-    def _policy_count_limit(self, row_count: int) -> int:
-        # row_count works because of min() in percentage
-        # and count or percentage must exist at all times
-        result = row_count
-        if self.policy.limit.count is not None:
-            result = self.policy.limit.count
-        if self.policy.limit.percentage is not None:
-            limit_percent = math.floor(row_count * self.policy.limit.percentage / 100)
-            result = min(limit_percent, result)
-        return result
-
-    @staticmethod
-    def _sample_count(table_sample: table.TableSample, row_count: int) -> int:
-        # 0 works because of max() at percentage
-        # and count or percentage must exist at all times
-        result = 0
-        if table_sample.sample.size.count is not None:
-            result = table_sample.sample.size.count
-        if table_sample.sample.size.percentage is not None:
-            limit_percent = math.ceil(row_count * table_sample.sample.size.percentage / 100)
-            result = max(limit_percent, result)
-        return result
-
-    @staticmethod
-    def _sample_copy_with_count(
-        table_sample: table.TableSample, sample_size: int
-    ) -> table.TableSample:
+        compliant_sample = self.policy.compliant_sample(table_sample.sample, row_count)
         return table.TableSample(
             table_reference=table_sample.table_reference,
-            sample=table.Sample(
-                spec=table_sample.sample.spec,
-                size=table.SizeSpec(count=sample_size),
-            ),
+            sample=compliant_sample,
         )

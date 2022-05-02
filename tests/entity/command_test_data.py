@@ -19,9 +19,7 @@ _TEST_TARGET_TABLE_REF: table.TableReference = _TEST_SOURCE_TABLE_REF.clone(
 )
 _TEST_SAMPLE_SIZE: table.SizeSpec = table.SizeSpec(count=11)
 _TEST_SAMPLE_SPEC: table.SampleSpec = table.SampleSpec()
-_TEST_SAMPLE_SPEC_RANDOM: table.SampleSpec = table.SampleSpec(
-    type=table.SortType.RANDOM.value
-)
+_TEST_SAMPLE_SPEC_RANDOM: table.SampleSpec = table.SampleSpec(type=table.SortType.RANDOM.value)
 _TEST_SORT_BY: str = 'TEST_COLUMN'
 _TEST_SORT_DIR: str = table.SortDirection.DESC.value
 _TEST_SORT_PROPERTIES: table._SortProperties = table._SortProperties(
@@ -55,21 +53,17 @@ TEST_COMMAND_SAMPLE_START: command.CommandSampleStart = command.CommandSampleSta
     sample_request=_TEST_SAMPLE_REQUEST,
     target_table=_TEST_TARGET_TABLE_REF,
 )
-TEST_COMMAND_SAMPLE_START_RANDOM: command.CommandSampleStart = (
-    command.CommandSampleStart(
-        type=command.CommandType.SAMPLE_START.value,
-        timestamp=17,
-        sample_request=_TEST_SAMPLE_REQUEST_RANDOM,
-        target_table=_TEST_TARGET_TABLE_REF,
-    )
+TEST_COMMAND_SAMPLE_START_RANDOM: command.CommandSampleStart = command.CommandSampleStart(
+    type=command.CommandType.SAMPLE_START.value,
+    timestamp=17,
+    sample_request=_TEST_SAMPLE_REQUEST_RANDOM,
+    target_table=_TEST_TARGET_TABLE_REF,
 )
-TEST_COMMAND_SAMPLE_START_SORTED: command.CommandSampleStart = (
-    command.CommandSampleStart(
-        type=command.CommandType.SAMPLE_START.value,
-        timestamp=17,
-        sample_request=_TEST_SAMPLE_REQUEST_SORTED,
-        target_table=_TEST_TARGET_TABLE_REF,
-    )
+TEST_COMMAND_SAMPLE_START_SORTED: command.CommandSampleStart = command.CommandSampleStart(
+    type=command.CommandType.SAMPLE_START.value,
+    timestamp=17,
+    sample_request=_TEST_SAMPLE_REQUEST_SORTED,
+    target_table=_TEST_TARGET_TABLE_REF,
 )
 TEST_COMMAND_SAMPLE_DONE: command.CommandSampleDone = command.CommandSampleDone(
     type=command.CommandType.SAMPLE_DONE.value,

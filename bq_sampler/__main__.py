@@ -124,7 +124,7 @@ def sample_request(  # pylint: disable=redefined-outer-name
     effective_policy = _patch_and_print_policy(pol, default_policy)
     _print_display_separator()
     sample_req = _read_and_print_sample_request(request)
-    _patch_and_print_request(sample_req, effective_policy)
+    _patch_and_print_request(sample_req, effective_policy, size)
     _print_display_separator()
 
 
@@ -136,11 +136,13 @@ def _read_and_print_sample_request(in_text: io.TextIOWrapper) -> table.Sample:
 
 
 def _patch_and_print_request(
-    request: table.Sample, request_policy: policy_.Policy
+    request: table.Sample, request_policy: policy_.Policy, size: int
 ) -> table.Sample:
     # pylint: disable=protected-access
-    result = sampler_bucket._overwrite_request(request, request_policy)
-    _print_policy('Effective request:', result)
+    effective_request = sampler_bucket._overwrite_request(request, request_policy)
+    _print_policy('Effective request:', effective_request)
+    result = request_policy.compliant_sample(effective_request, size)
+    _print_policy('Effective sample:', result)
     return result
 
 

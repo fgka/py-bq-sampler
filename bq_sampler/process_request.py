@@ -191,13 +191,9 @@ def _process_sample_start(cmd: command.CommandSampleStart) -> None:
         )
         sampler_query.create_table_with_sorted_sample(**kwargs)  # pylint: disable=missing-kwoa
     else:
-        raise ValueError(
-            f'Cannot process sample request of type <{sample_type}> in <{cmd}>'
-        )
+        raise ValueError(f'Cannot process sample request of type <{sample_type}> in <{cmd}>')
     end_timestamp = int(time.time())
-    sample_done = _create_sample_done_cmd(
-        cmd, start_timestamp, end_timestamp, error_message
-    )
+    sample_done = _create_sample_done_cmd(cmd, start_timestamp, end_timestamp, error_message)
     pubsub.publish(sample_done.as_dict(), _general_config().pubsub_request)
 
 
