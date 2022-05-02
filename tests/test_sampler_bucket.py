@@ -7,7 +7,7 @@
 
 from typing import Set
 
-from bq_sampler.dto import policy
+from bq_sampler.entity import policy
 from bq_sampler import const
 from bq_sampler import sampler_bucket
 

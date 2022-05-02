@@ -7,8 +7,8 @@ from typing import Any
 import attrs
 
 from bq_sampler import const
-from bq_sampler.dto import attrs_defaults
-from bq_sampler.dto import sample
+from bq_sampler.entity import attrs_defaults
+from bq_sampler.entity import table
 
 
 class RequestType(attrs_defaults.EnumWithFromStrIgnoreCase):
@@ -55,11 +55,11 @@ class EventRequestSampleStart(EventRequest):  # pylint: disable=too-few-public-m
     To request the sampling of a specific table.
     """
 
-    source_table: sample.TableReference = attrs.field(
-        validator=attrs.validators.instance_of(sample.TableReference)
+    sample_request: table.TableSample = attrs.field(
+        validator=attrs.validators.instance_of(table.TableSample)
     )
-    sample_request: sample.TableSample = attrs.field(
-        validator=attrs.validators.instance_of(sample.TableSample)
+    target_table: table.TableReference = attrs.field(
+        validator=attrs.validators.instance_of(table.TableReference)
     )
 
 
@@ -71,4 +71,4 @@ class EventRequestSampleDone(EventRequestSampleStart):  # pylint: disable=too-fe
 
     start_timestamp: int = attrs.field(validator=attrs.validators.gt(0))
     end_timestamp: int = attrs.field(validator=attrs.validators.gt(0))
-    error_message: str = attrs.field(validator=attrs.validators.instance_of(str))
+    error_message: str = attrs.field(default='', validator=attrs.validators.instance_of(str))

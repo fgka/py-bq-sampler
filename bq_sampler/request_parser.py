@@ -6,17 +6,18 @@ from typing import Any, Dict
 
 import logging
 
-from bq_sampler.dto import request
+from bq_sampler.entity import request
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def to_event_request(value: Dict[str, Any]) -> request.EventRequest:
+def to_event_request(value: Dict[str, Any], timestamp: int) -> request.EventRequest:
     """
     Converts a dictionary to the corresponding
         :py:class:`request.EventRequest` subclass.
 
     :param value:
+    :param timestamp:
     :return:
     """
     # validate input
@@ -25,9 +26,12 @@ def to_event_request(value: Dict[str, Any]) -> request.EventRequest:
     req_type = request.RequestType.from_str(value.get('type'))
     if not req_type:
         raise ValueError(f'Cannot create request of type <{req_type}> in argument <{value}>')
-    request_timestamp = None  # TODO
+    if not isinstance(timestamp, int) or timestamp <= 0:
+        raise ValueError(
+            f'Timestamp must be a positive {int.__name__}. Got <{timestamp}>({type(timestamp)})'
+        )
     # logic
-    value['request_timestamp'] = request_timestamp
+    value['request_timestamp'] = timestamp
     if req_type == request.RequestType.START:
         result = request.EventRequestStart.from_dict(value)
     elif req_type == request.RequestType.SAMPLE_START:

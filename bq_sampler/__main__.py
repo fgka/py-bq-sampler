@@ -11,8 +11,8 @@ from typing import Tuple
 import attrs
 import click
 
-from bq_sampler.dto import policy as policy_
-from bq_sampler.dto import sample
+from bq_sampler.entity import policy as policy_
+from bq_sampler.entity import table
 from bq_sampler import sampler_bucket
 
 
@@ -128,16 +128,16 @@ def sample_request(  # pylint: disable=redefined-outer-name
     _print_display_separator()
 
 
-def _read_and_print_sample_request(in_text: io.TextIOWrapper) -> sample.Sample:
+def _read_and_print_sample_request(in_text: io.TextIOWrapper) -> table.Sample:
     _print_display_separator()
-    result = sample.Sample.from_json(in_text.read())
+    result = table.Sample.from_json(in_text.read())
     _print_policy(f'Sample request: {in_text.name}', result)
     return result
 
 
 def _patch_and_print_request(
-    request: sample.Sample, request_policy: policy_.Policy
-) -> sample.Sample:
+    request: table.Sample, request_policy: policy_.Policy
+) -> table.Sample:
     # pylint: disable=protected-access
     result = sampler_bucket._overwrite_request(request, request_policy)
     _print_policy('Effective request:', result)

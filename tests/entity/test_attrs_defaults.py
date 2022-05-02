@@ -13,7 +13,7 @@ import attrs
 import deepdiff
 
 from bq_sampler import const
-from bq_sampler.dto import attrs_defaults
+from bq_sampler.entity import attrs_defaults
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)

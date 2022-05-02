@@ -7,7 +7,6 @@ GCP CloudFunction mandatory entry point:
 * https://cloud.google.com/functions/docs/tutorials/pubsub
 """
 # pylint: enable=line-too-long
-import base64
 import logging
 import os
 from typing import Any, Optional
@@ -21,7 +20,7 @@ client.setup_logging()
 
 import flask  # pylint: disable=wrong-import-position
 
-from bq_sampler import gcp_function  # pylint: disable=wrong-import-position
+from bq_sampler import entry  # pylint: disable=wrong-import-position
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,18 +47,25 @@ def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
                         pubsub.googleapis.com, the triggering topic's name, and
                         the triggering event type
                         `type.googleapis.com/google.pubsub.v1.PubsubMessage`.
-    Returns:
-        Proxied response from the actual implementation.
     """
-    _LOGGER.info('Processing event <%s> and context <%s>', event, context)
-    event_data = event.get('data') if event is not None else None
-    if event_data is not None:
-        data = base64.b64decode(event_data).decode('utf-8')
-        _LOGGER.info('Event data: <%s>', data)
+    _LOGGER.debug(
+        'Processing event <%s> and context <%s>. Environment: %s', event, context, str(os.environ)
+    )
     try:
-        gcp_function.handler(event, context)
+        entry.handler(event, context)
+        _LOGGER.debug(
+            'Finished processing event <%s> and context <%s>. Environment: %s',
+            event,
+            context,
+            str(os.environ),
+        )
+        flask.jsonify(success=True)
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Error processing event <{event}> and context <{context}>. Error: {err}'
+        msg = (
+            f'Could not process event: <{event}>,'
+            f' context: <{context}>,'
+            f' and environment: <{os.environ}>.'
+            f' Error: {err}'
+        )
         _LOGGER.critical(msg)
-        _LOGGER.warning('Environment: %s', str(os.environ))
         flask.abort(500, {'message': msg})

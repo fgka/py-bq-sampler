@@ -7,11 +7,11 @@ from typing import Any, Optional
 import attrs
 
 from bq_sampler import const
-from bq_sampler.dto import attrs_defaults
+from bq_sampler.entity import attrs_defaults
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class SampleSize(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
+class SizeSpec(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     Sample size as in::
         size = {
@@ -94,7 +94,7 @@ class SortType(attrs_defaults.EnumWithFromStrIgnoreCase):
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
-class SortAlgorithm(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
+class SampleSpec(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-public-methods
     """
     DTO for the sort algorithm as in::
         sort_algorithm = {
@@ -107,7 +107,7 @@ class SortAlgorithm(attrs_defaults.HasFromJsonString):  # pylint: disable=too-fe
     """
 
     type: str = attrs.field(
-        default=SortType.default(),
+        default=SortType.default().value,
         validator=attrs.validators.optional(validator=attrs.validators.instance_of(str)),
     )
     properties: _SortProperties = attrs.field(
@@ -147,13 +147,13 @@ class Sample(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
         }
     """
 
-    size: SampleSize = attrs.field(
+    size: SizeSpec = attrs.field(
         default=None,
-        validator=attrs.validators.optional(validator=attrs.validators.instance_of(SampleSize)),
+        validator=attrs.validators.optional(validator=attrs.validators.instance_of(SizeSpec)),
     )
-    spec: SortAlgorithm = attrs.field(
+    spec: SampleSpec = attrs.field(
         default=None,
-        validator=attrs.validators.optional(validator=attrs.validators.instance_of(SortAlgorithm)),
+        validator=attrs.validators.optional(validator=attrs.validators.instance_of(SampleSpec)),
     )
 
     def patch_is_substitution(self) -> bool:

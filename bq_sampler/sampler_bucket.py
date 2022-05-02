@@ -14,8 +14,8 @@ from typing import Any, Callable, Generator, Tuple
 
 from bq_sampler import const
 from bq_sampler.gcp import gcs
-from bq_sampler.dto import policy
-from bq_sampler.dto import sample
+from bq_sampler.entity import policy
+from bq_sampler.entity import table
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def _retrieve_all_table_policies(
 
 
 def _retrieve_all_with_table_reference(
-    bucket_name: str, convert_fn: Callable[[sample.TableReference, str], Any]
+    bucket_name: str, convert_fn: Callable[[table.TableReference, str], Any]
 ) -> Generator[Any, None, None]:
 
     for table_reference, obj_path in _list_all_table_references_obj_path(bucket_name):
@@ -115,20 +115,20 @@ def _retrieve_all_with_table_reference(
 
 def _list_all_table_references_obj_path(
     bucket_name: str,
-) -> Generator[Tuple[sample.TableReference, str], None, None]:
+) -> Generator[Tuple[table.TableReference, str], None, None]:
     def filter_fn(value: str) -> bool:
         return value.endswith(const.JSON_EXT) and len(value.split('/')) == 3
 
     for obj_path in gcs.list_objects(bucket_name, filter_fn):
         project_id, dataset_id, table_id_file = obj_path.split('/')
         table_id = table_id_file[: -len(const.JSON_EXT)]
-        table_reference = sample.TableReference(
+        table_reference = table.TableReference(
             project_id=project_id, dataset_id=dataset_id, table_id=table_id
         )
         yield table_reference, obj_path
 
 
-def all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None, None]:
+def all_sample_requests(bucket_name: str) -> Generator[table.TableSample, None, None]:
     """
     The output is already containing the requested samples
 
@@ -144,25 +144,25 @@ def all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None,
         yield request
 
 
-def _retrieve_all_sample_requests(bucket_name: str) -> Generator[sample.TableSample, None, None]:
-    def convert_fn(table_reference, obj_path) -> sample.TableSample:
+def _retrieve_all_sample_requests(bucket_name: str) -> Generator[table.TableSample, None, None]:
+    def convert_fn(table_reference, obj_path) -> table.TableSample:
         table_sample = _sample_request(bucket_name, obj_path)
-        result = sample.TableSample(table_reference=table_reference, sample=table_sample)
+        result = table.TableSample(table_reference=table_reference, sample=table_sample)
         return result
 
     for request in _retrieve_all_with_table_reference(bucket_name, convert_fn):
         yield request
 
 
-def _sample_request(bucket_name: str, request_filename: str) -> sample.Sample:
+def _sample_request(bucket_name: str, request_filename: str) -> table.Sample:
     sample_json_string: str = _fetch_gcs_object_as_string(bucket_name, request_filename)
-    result = sample.Sample.from_json(sample_json_string)
+    result = table.Sample.from_json(sample_json_string)
     return result
 
 
 def sample_request_from_policy(
     bucket_name: str, table_policy: policy.TablePolicy
-) -> sample.TableSample:
+) -> table.TableSample:
     """
     For a given :py:class:`policy.TablePolicy` create a corresponding
     :py:class:`sample.TableSample`, where the sample is overwritten, if necessary,
@@ -175,17 +175,17 @@ def sample_request_from_policy(
     # get overwritten request with policy default sample
     req_sample = _sample_request(bucket_name, _json_object_path(table_policy.table_reference))
     effective_sample = _overwrite_request(req_sample, table_policy.policy)
-    result = sample.TableSample(
+    result = table.TableSample(
         table_reference=table_policy.table_reference, sample=effective_sample
     )
     return result
 
 
-def _overwrite_request(request: sample.Sample, request_policy: policy.Policy) -> sample.Sample:
+def _overwrite_request(request: table.Sample, request_policy: policy.Policy) -> table.Sample:
     return request.patch_with(request_policy.default_sample)
 
 
-def _json_object_path(table_reference: sample.TableReference) -> str:
+def _json_object_path(table_reference: table.TableReference) -> str:
     return '/'.join(
         [
             table_reference.project_id,

@@ -11,11 +11,11 @@ import pytest
 
 import attrs
 
-from bq_sampler.dto import sample
+from bq_sampler.entity import table
 
 
 @pytest.mark.incremental
-class TestSampleSize:
+class TestSizeSpec:
     @pytest.mark.parametrize(
         'count,percentage',
         [
@@ -31,12 +31,12 @@ class TestSampleSize:
     )
     def test_ctor_ok(self, count: int, percentage: float):
         # Given/When
-        obj = sample.SampleSize(count=count, percentage=percentage)
+        obj = table.SizeSpec(count=count, percentage=percentage)
         # Then
         assert obj.count == count
         assert obj.percentage == percentage
         obj_dict = attrs.asdict(obj)
-        assert obj == sample.SampleSize.from_dict(obj_dict)
+        assert obj == table.SizeSpec.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
         'count,percentage',
@@ -54,7 +54,7 @@ class TestSampleSize:
     )
     def test_ctor_nok(self, count: int, percentage: float):
         with pytest.raises(ValueError):
-            sample.SampleSize(count=count, percentage=percentage)
+            table.SizeSpec(count=count, percentage=percentage)
 
 
 @pytest.mark.incremental
@@ -62,92 +62,101 @@ class Test_SortProperties:
     @pytest.mark.parametrize(
         'by,direction',
         [
-            ("column", sample.SortDirection.ASC.value),
-            ("column", sample.SortDirection.DESC.value),
+            ("column", table.SortDirection.ASC.value),
+            ("column", table.SortDirection.DESC.value),
         ],
     )
     def test_ctor_ok(self, by: str, direction: str):
         # Given/When
-        obj = sample._SortProperties(by=by, direction=direction)
+        obj = table._SortProperties(by=by, direction=direction)
         # Then
         assert obj.by == by
         assert obj.direction == direction
         obj_dict = attrs.asdict(obj)
-        assert obj == sample._SortProperties.from_dict(obj_dict)
+        assert obj == table._SortProperties.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
         'by,direction',
         [
             (None, None),  # None is not str
             ("column", None),  # None is not str
-            (None, sample.SortDirection.ASC.value),  # None is not str
-            (123, sample.SortDirection.ASC.value),  # int is not str
-            ("column", sample.SortDirection.ASC),  # enum is not str
+            (None, table.SortDirection.ASC.value),  # None is not str
+            (123, table.SortDirection.ASC.value),  # int is not str
+            ("column", table.SortDirection.ASC),  # enum is not str
         ],
     )
     def test_ctor_nok_type(self, by: Any, direction: Any):
         with pytest.raises(TypeError):
-            sample._SortProperties(by=by, direction=direction)
+            table._SortProperties(by=by, direction=direction)
 
     @pytest.mark.parametrize(
         'by,direction',
         [
-            ("", sample.SortDirection.ASC.value),  # empty string as by
-            (" column", sample.SortDirection.ASC.value),  # leading space in by
-            ("column ", sample.SortDirection.ASC.value),  # trailing space in by
-            ("column", sample.SortDirection.ASC.value + "_NOT"),  # invalid direction
+            ("", table.SortDirection.ASC.value),  # empty string as by
+            (" column", table.SortDirection.ASC.value),  # leading space in by
+            ("column ", table.SortDirection.ASC.value),  # trailing space in by
+            ("column", table.SortDirection.ASC.value + "_NOT"),  # invalid direction
         ],
     )
     def test_ctor_nok_value(self, by: str, direction: str):
         with pytest.raises(ValueError):
-            sample._SortProperties(by=by, direction=direction)
+            table._SortProperties(by=by, direction=direction)
 
 
 @pytest.mark.incremental
 class TestSortType:
     def test_default_ok(self):
         # Given/When
-        result = sample.SortType.default()
+        result = table.SortType.default()
         # Then
-        assert result in sample.SortType
+        assert result in table.SortType
 
 
-_TEST_size: sample.SampleSize = sample.SampleSize(count=31, percentage=57.986)
+_TEST_size: table.SizeSpec = table.SizeSpec(count=31, percentage=57.986)
 _TEST_COLUMN: str = "TEST_COLUMN"
-_TEST_SORT_PROPERTIES: sample._SortProperties = sample._SortProperties(
-    by=_TEST_COLUMN, direction=sample.SortDirection.ASC.value
+_TEST_SORT_PROPERTIES: table._SortProperties = table._SortProperties(
+    by=_TEST_COLUMN, direction=table.SortDirection.ASC.value
 )
 
 
 @pytest.mark.incremental
-class TestSortAlgorithm:
+class TestSampleSpec:
     @pytest.mark.parametrize(
         'type,properties',
         [
             (None, None),
             (None, _TEST_SORT_PROPERTIES),
-            (sample.SortType.SORTED.value, None),
-            (sample.SortType.SORTED.value, _TEST_SORT_PROPERTIES),
-            (sample.SortType.RANDOM.value, _TEST_SORT_PROPERTIES),
+            (table.SortType.SORTED.value, None),
+            (table.SortType.SORTED.value, _TEST_SORT_PROPERTIES),
+            (table.SortType.RANDOM.value, _TEST_SORT_PROPERTIES),
         ],
     )
-    def test_ctor_ok(self, type: str, properties: sample._SortProperties):
-        obj = sample.SortAlgorithm(type=type, properties=properties)
+    def test_ctor_ok(self, type: str, properties: table._SortProperties):
+        # Given/When
+        obj = table.SampleSpec(type=type, properties=properties)
+        # Then
         assert obj.type == type
         assert obj.properties == properties
         obj_dict = attrs.asdict(obj)
-        assert obj == sample.SortAlgorithm.from_dict(obj_dict)
+        assert obj == table.SampleSpec.from_dict(obj_dict)
+
+    def test_ctor_ok_default(self):
+        # Given/When
+        obj = table.SampleSpec()
+        # Then
+        assert obj.type == table.SortType.default().value
+        assert obj.properties is None
 
     def test_ctor_nok(self):
-        for t in sample.SortType:
+        for t in table.SortType:
             with pytest.raises(ValueError):
-                sample.SortAlgorithm(type=t.value + "_NOT", properties=_TEST_SORT_PROPERTIES)
+                table.SampleSpec(type=t.value + "_NOT", properties=_TEST_SORT_PROPERTIES)
 
 
-_TEST_spec: sample.SortAlgorithm = sample.SortAlgorithm(
-    type=sample.SortType.SORTED.value, properties=_TEST_SORT_PROPERTIES
+_TEST_spec: table.SampleSpec = table.SampleSpec(
+    type=table.SortType.SORTED.value, properties=_TEST_SORT_PROPERTIES
 )
-_TEST_SAMPLE: sample.Sample = sample.Sample(size=_TEST_size, spec=_TEST_spec)
+_TEST_SAMPLE: table.Sample = table.Sample(size=_TEST_size, spec=_TEST_spec)
 
 
 @pytest.mark.incremental
@@ -161,12 +170,12 @@ class TestSample:
             (_TEST_size, _TEST_spec),
         ],
     )
-    def test_ctor_ok(self, size: sample.SampleSize, spec: sample.SortAlgorithm):
-        obj = sample.Sample(size=size, spec=spec)
+    def test_ctor_ok(self, size: table.SizeSpec, spec: table.SampleSpec):
+        obj = table.Sample(size=size, spec=spec)
         assert obj.size == size
         assert obj.spec == spec
         obj_dict = attrs.asdict(obj)
-        assert obj == sample.Sample.from_dict(obj_dict)
+        assert obj == table.Sample.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
         'size,spec',
@@ -178,7 +187,7 @@ class TestSample:
     )
     def test_ctor_nok_type(self, size: Any, spec: Any):
         with pytest.raises(TypeError):
-            sample.Sample(size=size, spec=spec)
+            table.Sample(size=size, spec=spec)
 
 
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
@@ -197,7 +206,7 @@ class TestTableReference:
         ],
     )
     def test_ctor_ok(self, project_id: str, dataset_id: str, table_id: str, location: str):
-        obj = sample.TableReference(
+        obj = table.TableReference(
             project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
         )
         assert obj.project_id == project_id
@@ -205,7 +214,7 @@ class TestTableReference:
         assert obj.table_id == table_id
         assert obj.location == location
         obj_dict = attrs.asdict(obj)
-        assert obj == sample.TableReference.from_dict(obj_dict)
+        assert obj == table.TableReference.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
         'project_id,dataset_id,table_id,location',
@@ -217,12 +226,12 @@ class TestTableReference:
     )
     def test_ctor_nok_type(self, project_id: Any, dataset_id: Any, table_id: Any, location: Any):
         with pytest.raises(TypeError):
-            sample.TableReference(
+            table.TableReference(
                 project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
             )
 
 
-_TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
+_TEST_TABLE_REFERENCE: table.TableReference = table.TableReference(
     project_id=_TEST_PROJECT_ID,
     dataset_id=_TEST_DATASET_ID,
     table_id=_TEST_TABLE_ID,
@@ -233,11 +242,11 @@ _TEST_TABLE_REFERENCE: sample.TableReference = sample.TableReference(
 @pytest.mark.incremental
 class TestTableSample:
     def test_ctor_ok(self):
-        obj = sample.TableSample(table_reference=_TEST_TABLE_REFERENCE, sample=_TEST_SAMPLE)
+        obj = table.TableSample(table_reference=_TEST_TABLE_REFERENCE, sample=_TEST_SAMPLE)
         assert obj.table_reference == _TEST_TABLE_REFERENCE
         assert obj.sample == _TEST_SAMPLE
         obj_dict = attrs.asdict(obj)
-        assert obj == sample.TableSample.from_dict(obj_dict)
+        assert obj == table.TableSample.from_dict(obj_dict)
 
     @pytest.mark.parametrize(
         'table_reference,sample_arg',
@@ -249,4 +258,4 @@ class TestTableSample:
     )
     def test_ctor_nok_type(self, table_reference: Any, sample_arg: Any):
         with pytest.raises(TypeError):
-            sample.TableSample(table_reference=table_reference, sample=sample_arg)
+            table.TableSample(table_reference=table_reference, sample=sample_arg)

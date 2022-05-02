@@ -12,26 +12,26 @@ from google.cloud import bigquery
 import pytest
 
 from bq_sampler import const
-from bq_sampler.dto import sample
+from bq_sampler.entity import table
 from bq_sampler import sampler_query
 
 
 _TEST_SOURCE_TABLE_FQN_ID: str = (
     'test_project_id_a.test_dataset_id_a.test_table_id_a@test_location_a'
 )
-_TEST_SOURCE_TABLE_REF: sample.TableReference = sample.TableReference.from_str(
+_TEST_SOURCE_TABLE_REF: table.TableReference = table.TableReference.from_str(
     _TEST_SOURCE_TABLE_FQN_ID
 )
 _TEST_TARGET_TABLE_FQN_ID: str = (
     'test_project_id_b.test_dataset_id_b.test_table_id_b@test_location_a'
 )
-_TEST_TARGET_TABLE_REF: sample.TableReference = sample.TableReference.from_str(
+_TEST_TARGET_TABLE_REF: table.TableReference = table.TableReference.from_str(
     _TEST_TARGET_TABLE_FQN_ID
 )
 _TEST_TARGET_DIFF_LOC_TABLE_FQN_ID: str = (
     'test_project_id_b.test_dataset_id_b.test_table_id_b@test_location_b'
 )
-_TEST_TARGET_DIFF_LOC_TABLE_REF: sample.TableReference = sample.TableReference.from_str(
+_TEST_TARGET_DIFF_LOC_TABLE_REF: table.TableReference = table.TableReference.from_str(
     _TEST_TARGET_DIFF_LOC_TABLE_FQN_ID
 )
 _TEST_SAMPLE_AMOUNT: int = 13

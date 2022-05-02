@@ -41,11 +41,12 @@ def read_object(bucket_name: str, path: str) -> bytes:
     bucket_name = bucket_name.strip('/')
     # logic
     gcs_uri = f'gs://{bucket_name}/{path}'
-    _LOGGER.info('Reading <%s>', gcs_uri)
+    _LOGGER.debug('Reading <%s>', gcs_uri)
     try:
         bucket = _bucket(bucket_name)
         blob = bucket.get_blob(path)
         result = blob.download_as_bytes()
+        _LOGGER.debug('Read <%s>', gcs_uri)
     except Exception as err:
         msg = f'Could not download content from <{gcs_uri}>. Error: {err}'
         _LOGGER.critical(msg)

@@ -36,7 +36,7 @@ def row_count(*, table_fqn_id: str) -> int:
     :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :return:
     """
-    _LOGGER.info('Reading table size from :<%s>', table_fqn_id)
+    _LOGGER.debug('Reading table size from :<%s>', table_fqn_id)
     table = _big_query.table(table_fqn_id=table_fqn_id)
     return table.num_rows
 
@@ -84,7 +84,7 @@ def drop_all_tables_by_labels(
     # validate input
     labels = _validate_table_labels(labels)
     # logic
-    _LOGGER.info('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
+    _LOGGER.debug('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
     filter_fn = _has_table_labels_fn(labels)
     _drop_all_tables_in_iter(
         _big_query.list_all_tables_with_filter(

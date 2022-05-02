@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from google.cloud import bigquery
 
 from bq_sampler import const
-from bq_sampler.dto import sample
+from bq_sampler.entity import table
 from bq_sampler.gcp import bq
 
 
@@ -91,7 +91,7 @@ Uses `INSERT`_ statements combined with `SELECT`_ statement using `ORDER BY`_ cl
 # pylint: enable=line-too-long
 
 
-def row_count(table_ref: sample.TableReference) -> int:
+def row_count(table_ref: table.TableReference) -> int:
     """
     Simple wrapper to :py:func:`bq.row_count`
 
@@ -101,7 +101,7 @@ def row_count(table_ref: sample.TableReference) -> int:
     return bq.row_count(table_fqn_id=table_ref.table_fqn_id())
 
 
-def random_sample(*, table_ref: sample.TableReference, amount: int) -> bigquery.table.RowIterator:
+def random_sample(*, table_ref: table.TableReference, amount: int) -> bigquery.table.RowIterator:
     """
     This will query the target table using BigQuery's `TABLESAMPLE`_ clause.
     This is important to know because for large tables the minimum amount is 1%
@@ -122,11 +122,11 @@ def random_sample(*, table_ref: sample.TableReference, amount: int) -> bigquery.
     return _random_sample(table_ref, amount)
 
 
-def _validate_table_reference(arg_name: str, table_ref: sample.TableReference) -> None:
-    if not isinstance(table_ref, sample.TableReference):
+def _validate_table_reference(arg_name: str, table_ref: table.TableReference) -> None:
+    if not isinstance(table_ref, table.TableReference):
         raise ValueError(
             f'Table reference for {arg_name} must be '
-            f'an instance of {sample.TableReference.__name__}. '
+            f'an instance of {table.TableReference.__name__}. '
             f'Got: <{table_ref}>{type(table_ref)}'
         )
 
@@ -151,8 +151,8 @@ def _validate_amount(amount: int) -> None:
         )
 
 
-def _random_sample(table_ref: sample.TableReference, amount: int) -> bigquery.table.RowIterator:
-    _LOGGER.info('Getting random sample of <%d> rows from table <%s>', amount, table_ref)
+def _random_sample(table_ref: table.TableReference, amount: int) -> bigquery.table.RowIterator:
+    _LOGGER.debug('Getting random sample of <%d> rows from table <%s>', amount, table_ref)
     # query
     percent_int = _int_percent_for_tablesample_stmt(table_ref.table_fqn_id(), amount)
     query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
@@ -201,7 +201,7 @@ def _int_percent_for_tablesample_stmt(table_fqn_id: str, amount: int) -> int:
 
 
 def sorted_sample(
-    *, table_ref: sample.TableReference, amount: int, column: str, order: str
+    *, table_ref: table.TableReference, amount: int, column: str, order: str
 ) -> bigquery.table.RowIterator:
     # pylint: disable=line-too-long
     """
@@ -229,9 +229,9 @@ def sorted_sample(
 
 
 def _sorted_sample(
-    table_ref: sample.TableReference, amount: int, column: str, order: str
+    table_ref: table.TableReference, amount: int, column: str, order: str
 ) -> bigquery.table.RowIterator:
-    _LOGGER.info(
+    _LOGGER.debug(
         'Getting sorted by <%s>:<%s> sample of <%d> rows from table <%s>',
         column,
         order,
@@ -258,8 +258,8 @@ def _validate_order(order: str) -> str:
 
 def create_table_with_random_sample(
     *,
-    source_table_ref: sample.TableReference,
-    target_table_ref: sample.TableReference,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
@@ -290,8 +290,8 @@ def create_table_with_random_sample(
 
 
 def _validate_table_to_table_sample(
-    source_table_ref: sample.TableReference,
-    target_table_ref: sample.TableReference,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
 ) -> None:
     _validate_table_reference('source_table_ref', source_table_ref)
     _validate_table_reference('target_table_ref', target_table_ref)
@@ -303,8 +303,8 @@ def _validate_table_to_table_sample(
 
 
 def _create_table_with_random_sample(
-    source_table_ref: sample.TableReference,
-    target_table_ref: sample.TableReference,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
@@ -345,8 +345,8 @@ def _create_table(
 
 def create_table_with_sorted_sample(
     *,
-    source_table_ref: sample.TableReference,
-    target_table_ref: sample.TableReference,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
     amount: int,
     column: str,
     order: str,
@@ -384,8 +384,8 @@ def create_table_with_sorted_sample(
 
 
 def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
-    source_table_ref: sample.TableReference,
-    target_table_ref: sample.TableReference,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
     amount: int,
     column: str,
     order: str,

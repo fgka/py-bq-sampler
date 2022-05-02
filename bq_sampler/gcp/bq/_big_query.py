@@ -125,7 +125,7 @@ def _table(table_spec: _SimpleTableSpec) -> bigquery.Table:
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=5))
 def _client(project_id: Optional[str] = None, location: Optional[str] = None) -> bigquery.Client:
-    _LOGGER.info(
+    _LOGGER.debug(
         'Creating BigQuery client for project ID <%s> and location <%s>', project_id, location
     )
     return bigquery.Client(project=project_id, location=location)
@@ -155,7 +155,7 @@ def query_job(
     location = _stripped_str_arg('location', location, True)
     # logic
     result = _query_job(query, job_config, project_id, location)
-    _LOGGER.info(
+    _LOGGER.debug(
         'Query <%s> stats: total bytes processed %s; total bytes billed %s; slot milliseconds: %s.',
         _query_job_to_log_str(result),
         result.total_bytes_processed,
@@ -172,7 +172,7 @@ def _query_job(
     location: Optional[str] = None,
 ) -> bigquery.job.query.QueryJob:
     query_parameters = job_config.query_parameters if job_config else None
-    _LOGGER.info('Issuing BigQuery query: <%s> with job_config: <%s>', query, query_parameters)
+    _LOGGER.debug('Issuing BigQuery query: <%s> with job_config: <%s>', query, query_parameters)
     try:
         result = _client(project_id, location).query(query, job_config=job_config)
     except Exception as err:  # pylint: disable=broad-except
@@ -216,7 +216,7 @@ def create_table(
     labels = _validate_table_labels(labels)
     _validate_schema(schema)
     # logic
-    _LOGGER.info('Creating table <%s> with labels: <%s>', table_fqn_id, labels)
+    _LOGGER.debug('Creating table <%s> with labels: <%s>', table_fqn_id, labels)
     dataset = _create_dataset(table_spec, labels, exists_ok=True)
     if drop_table_before:
         drop_table(table_fqn_id=table_fqn_id, not_found_ok=True)
@@ -241,7 +241,7 @@ def _create_dataset(
     labels: Dict[str, str],
     exists_ok: Optional[bool] = True,
 ) -> bigquery.Dataset:
-    _LOGGER.info(
+    _LOGGER.debug(
         'Creating dataset <%s.%s> with labels: <%s>',
         table_spec.project_id,
         table_spec.dataset_id,
@@ -293,7 +293,7 @@ def _create_table(  # pylint: disable=too-many-arguments
     labels: Dict[str, str],
     exists_ok: Optional[bool] = True,
 ) -> bigquery.Table:
-    _LOGGER.info(
+    _LOGGER.debug(
         'Creating table <%s> in dataset <%s> with labels: <%s>',
         table_spec.table_id,
         dataset.dataset_id,
@@ -354,7 +354,7 @@ def drop_table(*, table_fqn_id: str, not_found_ok: Optional[bool] = True) -> Non
 def _drop_table(
     bq_table: bigquery.Table, not_found_ok: bool, location: Optional[str] = None
 ) -> None:
-    _LOGGER.info('Dropping table <%s> with not_found_ok=<%s>', bq_table.table_id, not_found_ok)
+    _LOGGER.debug('Dropping table <%s> with not_found_ok=<%s>', bq_table.table_id, not_found_ok)
     try:
         _client(bq_table.project, location).delete_table(bq_table, not_found_ok=not_found_ok)
     except Exception as err:  # pylint: disable=broad-except
@@ -397,7 +397,7 @@ def _list_all_tables_with_filter(
     location: Optional[str] = None,
     filter_fn: Optional[Callable[[bigquery.table.TableListItem], bool]] = None,
 ) -> Generator[str, None, None]:
-    _LOGGER.info('Listing all tables in project <%s> with filter function', project_id)
+    _LOGGER.debug('Listing all tables in project <%s> with filter function', project_id)
     try:
         for ds_list_item in _list_all_datasets(project_id, location):
             for t_list_item in _list_all_tables_in_dataset(ds_list_item, location):
@@ -415,7 +415,7 @@ def _list_all_tables_with_filter(
 
 
 def _list_all_datasets(project_id: str, location: Optional[str] = None) -> page_iterator.Iterator:
-    _LOGGER.info('Listing all datasets in project <%s>', project_id)
+    _LOGGER.debug('Listing all datasets in project <%s>', project_id)
     try:
         result = _client(project_id, location).list_datasets(project=project_id, include_all=True)
     except Exception as err:  # pylint: disable=broad-except
@@ -428,7 +428,7 @@ def _list_all_datasets(project_id: str, location: Optional[str] = None) -> page_
 def _list_all_tables_in_dataset(
     dataset_list_item: bigquery.dataset.DatasetListItem, location: Optional[str] = None
 ) -> page_iterator.Iterator:
-    _LOGGER.info('Listing all tables in dataset <%s>', dataset_list_item.dataset_id)
+    _LOGGER.debug('Listing all tables in dataset <%s>', dataset_list_item.dataset_id)
     try:
         result = _client(dataset_list_item.project, location).list_tables(dataset_list_item)
     except Exception as err:  # pylint: disable=broad-except
