@@ -39,3 +39,14 @@ gcloud logging read \
   "resource.labels.function_name=${FUNCTION_NAME} severity>=CRITICAL" \
   --project="${PROJECT_ID}"
 ```
+
+
+### Testing
+
+End-to-End:
+
+```bash
+gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
+  --project="${PROJECT_ID}" \
+  --location="${LOCATION}"
+```

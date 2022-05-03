@@ -62,7 +62,7 @@ def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg
         flask.jsonify(success=True)
     except Exception as err:  # pylint: disable=broad-except
         msg = (
-            f'[{__name__}] Could not process event: <{event}>,'
+            f'Could not process event: <{event}>,'
             f' context: <{context}>,'
             f' and environment: <{os.environ}>.'
             f' Error: {err}'

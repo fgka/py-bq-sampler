@@ -29,8 +29,12 @@ def get(name: str, *, level: Optional[Union[str, int]] = None) -> logging.Logger
     """
     if not isinstance(name, str) or not name.strip():
         raise ValueError(f'Name must be a non-empty string. Got: <{name}>({type(name)})')
-    logging.basicConfig(level=_log_level(level), format=_LOGGER_FORMAT)
-    return logging.getLogger(name.strip())
+    level = _log_level(level)
+    logging.basicConfig(level=level, format=_LOGGER_FORMAT)
+    result = logging.getLogger(name.strip())
+    result.setLevel(level)
+    logging.DEBUG('Set log level for %s to %d', name, level)
+    return result
 
 
 def _log_level(level: Optional[Union[str, int]]) -> int:
