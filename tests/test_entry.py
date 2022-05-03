@@ -5,6 +5,7 @@
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
 import base64
+from datetime import datetime
 import json
 from typing import Any
 
@@ -14,7 +15,7 @@ from tests.entity import command_test_data
 
 
 class _StubContext:
-    def __init__(self, *, timestamp: int = 0):
+    def __init__(self, *, timestamp: str = ''):
         self.timestamp = timestamp
 
 
@@ -22,7 +23,8 @@ def test__from_pubsub_to_cmd_ok():
     # Given
     cmd = command_test_data.TEST_COMMAND_START
     timestamp = 123
-    context = _StubContext(timestamp=timestamp)
+    zulu_timestamp = datetime.utcfromtimestamp(timestamp).isoformat().replace('+00:00', 'Z')
+    context = _StubContext(timestamp=zulu_timestamp)
     event = _create_event_str(cmd.as_dict())
     # When
     result = entry._from_pubsub_to_cmd(event, context)
