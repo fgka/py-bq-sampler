@@ -105,11 +105,11 @@ def table(*, table_fqn_id: str) -> bigquery.Table:
     :return:
     """
     # validate input
-    _LOGGER.debug(f'Retrieving table metadata for <%s>', table_fqn_id)
+    _LOGGER.debug('Retrieving table metadata for <%s>', table_fqn_id)
     table_spec = _SimpleTableSpec(table_fqn_id)
     # logic
     result = _table(table_spec)
-    _LOGGER.debug(f'Retrieved table metadata for <%s> = %s', table_fqn_id, result)
+    _LOGGER.debug('Retrieved table metadata for <%s> = %s', table_fqn_id, result)
     return result
 
 
@@ -152,7 +152,9 @@ def query_job(
     .. docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
     """
     # validate input
-    _LOGGER.debug('Issuing query job for query <%s> in project <%s>@<%s>', query, project_id, location)
+    _LOGGER.debug(
+        'Issuing query job for query <%s> in project <%s>@<%s>', query, project_id, location
+    )
     query = _stripped_str_arg('query', query)
     project_id = _stripped_str_arg('project_id', project_id, True)
     location = _stripped_str_arg('location', location, True)

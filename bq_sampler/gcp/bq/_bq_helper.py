@@ -60,7 +60,9 @@ def query_job_result(
     :param location:
     :return:
     """
-    _LOGGER.debug('Issuing query job results for query <%s> in project <%s>@<%s>', query, project_id, location)
+    _LOGGER.debug(
+        'Issuing query job results for query <%s> in project <%s>@<%s>', query, project_id, location
+    )
     job = _bq_base.query_job(
         query=query, job_config=job_config, project_id=project_id, location=location
     )
@@ -70,7 +72,9 @@ def query_job_result(
         raise RuntimeError(
             f'Could not retrieve results from query <{job.query}>. Error: {err}'
         ) from err
-    _LOGGER.debug('Issued query job results for query <%s> in project <%s>@<%s>', query, project_id, location)
+    _LOGGER.debug(
+        'Issued query job results for query <%s> in project <%s>@<%s>', query, project_id, location
+    )
     return result
 
 

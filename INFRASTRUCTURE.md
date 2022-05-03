@@ -37,6 +37,14 @@ gcloud iam service-accounts create "${FUNCTION_SA}" \
 
 ### Add permissions
 
+PubSub publisher:
+
+```bash
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+  --member="serviceAccount:${FUNCTION_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+```
+
 BigQuery data read in hosting project:
 
 ```bash
@@ -51,6 +59,9 @@ BigQuery data editor in the target project:
 gcloud projects add-iam-policy-binding ${TARGET_PROJECT_ID} \
   --member="serviceAccount:${FUNCTION_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
   --role="roles/bigquery.dataEditor"
+gcloud projects add-iam-policy-binding ${TARGET_PROJECT_ID} \
+  --member="serviceAccount:${FUNCTION_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/bigquery.jobUser"
 ```
 
 Storage object view permissions:

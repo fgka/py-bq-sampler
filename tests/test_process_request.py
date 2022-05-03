@@ -19,6 +19,7 @@ _GENERAL_POLICY_PATH: str = 'default_policy.json'
 
 class _StubGeneralConfig:
     def __init__(self):
+        self.location = None
         self.target_project_id = None
         self.policy_bucket = None
         self.default_policy_path = None
@@ -114,6 +115,7 @@ def test__process_start_ok(monkeypatch):
     # Given
     cmd = command_test_data.TEST_COMMAND_START
     config = _StubGeneralConfig()
+    config.location = 'TEST_LOCATION'
     config.default_policy_path = 'DEFAULT_POLICY_PATH'
     config.policy_bucket = 'POLICY_BUCKET'
     config.request_bucket = 'REQUEST_BUCKET'

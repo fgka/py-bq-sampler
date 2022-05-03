@@ -9,6 +9,7 @@ Environment variables, see [process_request.py](./bq_sampler/process_request.py)
 ```bash
 unset ENV_VARS
 set -a ENV_VARS
+ENV_VARS+=("BQ_LOCATION=${LOCATION}")
 ENV_VARS+=("TARGET_PROJECT_ID=${TARGET_PROJECT_ID}")
 ENV_VARS+=("POLICY_BUCKET_NAME=${POLICY_BUCKET_NAME}")
 ENV_VARS+=("DEFAULT_POLICY_OBJECT_PATH=${DEFAULT_POLICY_OBJECT_PATH}")

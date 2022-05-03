@@ -14,12 +14,15 @@ from bq_sampler import logger
 
 _LOGGER = logger.get(__name__)
 
+_BQ_LOCATION_ENV_VAR: str = 'BQ_LOCATION'  # europe-west3
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default-policy.json
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'  # my-request-bucket
 _PUBSUB_CMD_TOPIC_ENV_VAR: str = 'CMD_TOPIC_NAME'  # projects/py-project-12345/topics/cmd-topic-name
-_PUBSUB_ERROR_TOPIC_ENV_VAR: str = 'ERROR_TOPIC_NAME'  # projects/py-project-12345/topics/error-topic-name
+_PUBSUB_ERROR_TOPIC_ENV_VAR: str = (
+    'ERROR_TOPIC_NAME'  # projects/py-project-12345/topics/error-topic-name
+)
 
 _PUBSUB_ERROR_CMD_ENTRY: str = 'command'
 _PUBSUB_ERROR_MSG_ENTRY: str = 'error'
@@ -27,12 +30,17 @@ _PUBSUB_ERROR_MSG_ENTRY: str = 'error'
 
 class _GeneralConfig:
     def __init__(self):
+        self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
         self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR)
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
+
+    @property
+    def location(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._location
 
     @property
     def target_project_id(self) -> str:  # pylint: disable=missing-function-docstring
@@ -105,6 +113,7 @@ def _process_start(cmd: command.CommandStart) -> None:
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
         default_policy_object_path=_general_config().default_policy_path,
+        location=_general_config().location,
     ):
         _LOGGER.info(
             'Retrieving request, if existent, for table <%s> from bucket <%s>',
