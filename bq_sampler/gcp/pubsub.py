@@ -34,9 +34,9 @@ def parse_json_data(value: Union[str, bytes]) -> Any:
         decoded_event_data = base64.b64decode(value).decode('utf-8')
         result = json.loads(decoded_event_data)
     except Exception as err:
-        msg = f'Could not parse PubSub data. Raw data: <{value}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
+        raise RuntimeError(
+            f'Could not parse PubSub data. Raw data: <{value}>. Error: {err}'
+        ) from err
     return result
 
 

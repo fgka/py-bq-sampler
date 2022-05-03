@@ -116,9 +116,9 @@ def _table(table_spec: _SimpleTableSpec) -> bigquery.Table:
             table_spec.table_id_only
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not retrieve table object for <{table_spec}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(
+            f'Could not retrieve table object for <{table_spec}>. Error: {err}'
+        ) from err
     return result
 
 
@@ -175,13 +175,11 @@ def _query_job(
     try:
         result = _client(project_id, location).query(query, job_config=job_config)
     except Exception as err:  # pylint: disable=broad-except
-        msg = (
+        raise RuntimeError(
             f'Could not issue BigQuery query: <{query}> '
             f'and job config: <{query_parameters}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
+        ) from err
     return result
 
 
@@ -252,22 +250,20 @@ def _create_dataset(
             const.BQ_TABLE_FQN_ID_SEP.join([table_spec.project_id, table_spec.dataset_id])
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = (
+        raise ValueError(
             f'Could not create input object {bigquery.Dataset.__name__} '
             f'for project ID <{table_spec.project_id}> and dataset ID <{table_spec.dataset_id}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        ) from err
     # Create dataset
     try:
         result = _client(table_spec.project_id, table_spec.location).create_dataset(
             result, exists_ok=exists_ok
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not create dataset for <{result.dataset_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(
+            f'Could not create dataset for <{result.dataset_id}>. Error: {err}'
+        ) from err
     # Add labels
     try:
         result.labels = labels
@@ -275,13 +271,11 @@ def _create_dataset(
             result, ['labels']
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = (
+        raise ValueError(
             f'Could not set labels for dataset <{result.dataset_id}> '
             f'with content: <{labels}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        ) from err
     return result
 
 
@@ -302,22 +296,18 @@ def _create_table(  # pylint: disable=too-many-arguments
     try:
         result = dataset.table(table_spec.table_id)
     except Exception as err:  # pylint: disable=broad-except
-        msg = (
+        raise ValueError(
             f'Could not create input object {bigquery.Table.__name__} '
             f'for dataset <{dataset.dataset_id}> and table ID <{table_spec.table_id}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        ) from err
     # Create table
     try:
         result = _client(dataset.project, table_spec.location).create_table(
             result, exists_ok=exists_ok
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not create table for <{result.table_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(f'Could not create table for <{result.table_id}>. Error: {err}') from err
     # Add labels and schema
     result.labels = labels
     result.schema = schema
@@ -326,13 +316,11 @@ def _create_table(  # pylint: disable=too-many-arguments
             result, ['labels', 'schema']
         )
     except Exception as err:  # pylint: disable=broad-except
-        msg = (
+        raise ValueError(
             f'Could not set labels for table <{result.table_id}> '
             f'with content: <{labels}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        ) from err
     return result
 
 
@@ -357,9 +345,7 @@ def _drop_table(
     try:
         _client(bq_table.project, location).delete_table(bq_table, not_found_ok=not_found_ok)
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not drop table <{bq_table.table_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(f'Could not drop table <{bq_table.table_id}>. Error: {err}') from err
 
 
 _FALLBACK_FILTER_FN: Callable[[bigquery.table.TableListItem], bool] = lambda _: True
@@ -408,9 +394,9 @@ def _list_all_tables_with_filter(
                         table_fqn_id = f'{table_fqn_id}{const.BQ_TABLE_FQN_LOCATION_SEP}{location}'
                     yield table_fqn_id
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not list all datasets in project <{project_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(
+            f'Could not list all datasets in project <{project_id}>. Error: {err}'
+        ) from err
 
 
 def _list_all_datasets(project_id: str, location: Optional[str] = None) -> page_iterator.Iterator:
@@ -418,9 +404,9 @@ def _list_all_datasets(project_id: str, location: Optional[str] = None) -> page_
     try:
         result = _client(project_id, location).list_datasets(project=project_id, include_all=True)
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not list all datasets in project <{project_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(
+            f'Could not list all datasets in project <{project_id}>. Error: {err}'
+        ) from err
     return result
 
 
@@ -431,9 +417,9 @@ def _list_all_tables_in_dataset(
     try:
         result = _client(dataset_list_item.project, location).list_tables(dataset_list_item)
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not list all tables in dataset <{dataset_list_item.dataset_id}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise ValueError(msg) from err
+        raise ValueError(
+            f'Could not list all tables in dataset <{dataset_list_item.dataset_id}>. Error: {err}'
+        ) from err
     return result
 
 

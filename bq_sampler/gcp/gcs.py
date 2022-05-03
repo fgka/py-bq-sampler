@@ -45,12 +45,18 @@ def read_object(bucket_name: str, path: str) -> bytes:
     try:
         bucket = _bucket(bucket_name)
         blob = bucket.get_blob(path)
-        result = blob.download_as_bytes()
-        _LOGGER.debug('Read <%s>', gcs_uri)
+        if blob is not None:
+            result = blob.download_as_bytes()
+            _LOGGER.debug('Read <%s>', gcs_uri)
+        else:
+            result = None
+            _LOGGER.warning(
+                'Object %s does not exist or does not contain data. Returning %s', gcs_uri, result
+            )
     except Exception as err:
-        msg = f'Could not download content from <{gcs_uri}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise CloudStorageDownloadError(msg) from err
+        raise CloudStorageDownloadError(
+            f'Could not download content from <{gcs_uri}>. Error: {err}'
+        ) from err
     return result
 
 
@@ -118,12 +124,10 @@ def list_objects(
             if filter_fn(obj_path):
                 yield obj_path
         except Exception as err:
-            msg = (
+            raise CloudStorageListError(
                 f'Could not add blob named <{obj_path}> from bucket <{bucket_name}>. '
                 f'Stopping list now. Error: <{err}>'
-            )
-            _LOGGER.critical(msg)
-            raise CloudStorageListError(msg) from err
+            ) from err
 
 
 def _list_blob_names(bucket_name: str) -> Generator[str, None, None]:

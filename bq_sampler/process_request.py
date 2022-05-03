@@ -76,9 +76,7 @@ def process(cmd: command.CommandBase) -> None:
             _PUBSUB_ERROR_MSG_ENTRY: str(err),
         }
         pubsub.publish(error_data, _general_config().pubsub_error)
-        msg = f'Could not process command: <{cmd}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
+        raise RuntimeError(f'Could not process command: <{cmd}>. Error: {err}') from err
 
 
 def _process(cmd: command.CommandBase) -> None:

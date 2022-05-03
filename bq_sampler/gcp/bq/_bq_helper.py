@@ -64,9 +64,9 @@ def query_job_result(
     try:
         result = job.result()
     except Exception as err:  # pylint: disable=broad-except
-        msg = f'Could not retrieve results from query <{job.query}>. Error: {err}'
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
+        raise RuntimeError(
+            f'Could not retrieve results from query <{job.query}>. Error: {err}'
+        ) from err
     return result
 
 
@@ -118,9 +118,7 @@ def _drop_all_tables_in_iter(tables_to_drop_gen: Generator[str, None, None]) -> 
         try:
             _bq_base.drop_table(table_fqn_id=table_fqn_id)
         except Exception as err:  # pylint: disable=broad-except
-            msg = f'Cloud not drop table <{table_fqn_id}>. Error: {err}'
-            _LOGGER.critical(msg)
-            error_msgs.append(msg)
+            error_msgs.append(f'Cloud not drop table <{table_fqn_id}>. Error: {err}')
             last_error = err
     if last_error is not None:
         raise RuntimeError('+++'.join(error_msgs)) from last_error

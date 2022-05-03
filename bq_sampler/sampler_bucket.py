@@ -68,7 +68,12 @@ def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
     result = None
     try:
         content = gcs.read_object(bucket_name, object_path)
-        result = content.decode('utf-8')
+        if content is not None:
+            result = content.decode('utf-8')
+        else:
+            _LOGGER.warning(
+                'No content to decode for bucket %s and object %s', bucket_name, object_path
+            )
     except Exception as err:  # pylint: disable=broad-except
         _LOGGER.warning(
             'Could not load content as string from <%s> in bucket <%s>. Ignoring. Error: %s',

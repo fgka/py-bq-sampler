@@ -46,14 +46,12 @@ def handler(  # pylint: disable=unused-argument
     try:
         _handler(event, context)
     except Exception as err:
-        msg = (
+        raise RuntimeError(
             f'Could not process event: <{event}>,'
             f' context: <{context}>,'
             f' and environment: <{os.environ}>. '
             f'Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise RuntimeError(msg) from err
+        ) from err
 
 
 def _handler(
@@ -73,10 +71,8 @@ def _from_pubsub_to_cmd(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         timestamp: int = calendar.timegm(datetime.fromisoformat(plain_iso_dateime).utctimetuple())
     except Exception as err:
-        msg = (
+        raise RuntimeError(
             f'Could not extract timestamp from <{context.timestamp}>({type(context.timestamp)}).'
             f' Error: {err}'
-        )
-        _LOGGER.critical(msg)
-        raise RuntimeError from err
+        ) from err
     return command_parser.to_command(cmd_dict, timestamp)

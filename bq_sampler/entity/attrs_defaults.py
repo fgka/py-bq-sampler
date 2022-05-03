@@ -77,23 +77,19 @@ class HasPatchWith(HasIsEmpty):
         try:
             kwargs = self._create_merge_kwargs(value)
         except Exception as err:  # pylint: disable=broad-except[
-            msg = (
+            raise ValueError(
                 f'Could not create merge kwargs. Current object: <{self}>. '
                 f'Value: <{value}>. '
                 f'Error: {err}'
-            )
-            _LOGGER.critical(msg)
-            raise ValueError(msg) from err
+            ) from err
         try:
             result = self.__class__(**kwargs)
         except Exception as err:  # pylint: disable=broad-except
-            msg = (
+            raise ValueError(
                 f'Could not instantiate <{self.__class__.__name__}> '
                 f'from kwargs <{kwargs}>. '
                 f'Error: {err}'
-            )
-            _LOGGER.critical(msg)
-            raise ValueError(msg) from err
+            ) from err
         return result
 
     def _create_merge_kwargs(self, value: Any) -> Dict[str, Any]:
@@ -173,9 +169,9 @@ class HasFromDict(HasPatchWith):
         try:
             result = cls(**kwargs)
         except Exception as err:  # pylint: disable=broad-except
-            msg = f'Could not instantiate <{cls.__name__}> from kwargs <{kwargs}>. Error: {err}'
-            _LOGGER.critical(msg)
-            raise ValueError(msg) from err
+            raise ValueError(
+                f'Could not instantiate <{cls.__name__}> from kwargs <{kwargs}>. Error: {err}'
+            ) from err
         return result
 
     @classmethod
@@ -238,16 +234,14 @@ class HasFromJsonString(HasFromDict):
         try:
             value_dict = attrs.asdict(self)
         except Exception as err:  # pylint: disable=broad-except
-            msg = f'Could not convert <{self}> to a dictionary. Error: {err}'
-            _LOGGER.critical(msg)
-            raise ValueError(msg) from err
+            raise ValueError(f'Could not convert <{self}> to a dictionary. Error: {err}') from err
         # now to a JSON string from the dict
         try:
             result = json.dumps(value_dict)
         except Exception as err:  # pylint: disable=broad-except
-            msg = f'Could not convert <{value_dict}>, from <{self}>, to a JSON string. Error: {err}'
-            _LOGGER.critical(msg)
-            raise ValueError(msg) from err
+            raise ValueError(
+                f'Could not convert <{value_dict}>, from <{self}>, to a JSON string. Error: {err}'
+            ) from err
         return result
 
 
