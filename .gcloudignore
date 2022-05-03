@@ -1,0 +1,17 @@
+.gcloudignore
+.git
+.gitignore
+.venv
+.pytest_cache
+**.eggs
+**.egg-info
+**.md
+**__pycache__
+tests
+dist
+build
+pytest.ini
+pyproject.toml
+setup.cfg
+setup.py
+#!include:.gitignore

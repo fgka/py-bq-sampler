@@ -18,7 +18,7 @@ _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'
-_PUBSUB_REQUEST_TOPIC_ENV_VAR: str = 'REQUEST_TOPIC_NAME'
+_PUBSUB_CMD_TOPIC_ENV_VAR: str = 'CMD_TOPIC_NAME'
 _PUBSUB_ERROR_TOPIC_ENV_VAR: str = 'ERROR_TOPIC_NAME'
 
 _PUBSUB_ERROR_CMD_ENTRY: str = 'command'
@@ -31,7 +31,7 @@ class _GeneralConfig:
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
         self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR)
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
-        self._pubsub_request = os.environ.get(_PUBSUB_REQUEST_TOPIC_ENV_VAR)
+        self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
 
     @property

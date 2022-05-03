@@ -1,0 +1,23 @@
+{
+  "displayName": "@@FUNCTION_NAME@@-error-monitoring",
+  "documentation": {
+    "content": "Alerts for @@FUNCTION_NAME@@ execution errors",
+    "mimeType": "text/markdown"
+  },
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "604800s"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "conditionMatchedLog": {
+        "filter": "resource.labels.function_name=\"@@FUNCTION_NAME@@\"\nseverity>=\"ERROR\""
+      },
+      "displayName": "Log match condition"
+    }
+  ],
+  "enabled": true
+}

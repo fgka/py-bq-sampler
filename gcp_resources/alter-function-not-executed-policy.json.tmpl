@@ -1,0 +1,33 @@
+{
+  "displayName": "@@FUNCTION_NAME@@-not-executed-monitoring",
+  "documentation": {
+    "content": "Alert if function @@FUNCTION_NAME@@ is not executed within a day",
+    "mimeType": "text/markdown"
+  },
+  "alertStrategy": {
+    "autoClose": "604800s"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Executions for @@FUNCTION_NAME@@ [COUNT]",
+      "conditionThreshold": {
+        "aggregations": [
+          {
+            "alignmentPeriod": "86400s",
+            "crossSeriesReducer": "REDUCE_COUNT",
+            "perSeriesAligner": "ALIGN_RATE"
+          }
+        ],
+        "comparison": "COMPARISON_LT",
+        "duration": "3600s",
+        "filter": "metric.type=\"cloudfunctions.googleapis.com/function/execution_count\" resource.type=\"cloud_function\" resource.label.\"function_name\"=\"@@FUNCTION_NAME@@\"",
+        "thresholdValue": 1,
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "enabled": true
+}
