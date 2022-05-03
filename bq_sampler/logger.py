@@ -13,6 +13,7 @@ from typing import Optional, Union
 
 LOG_LEVEL_ENV_VAR_NAME: str = 'LOG_LEVEL'
 _DEFAULT_LOG_LEVEL: int = logging.INFO
+_LOGGER_FORMAT: str = '[%(asctime)s %(filename)s.%(funcName)s:%(lineno)s]%(levelname)s: %(message)s'
 
 
 def get(name: str, *, level: Optional[Union[str, int]] = None) -> logging.Logger:
@@ -29,7 +30,7 @@ def get(name: str, *, level: Optional[Union[str, int]] = None) -> logging.Logger
     if not isinstance(name, str) or not name.strip():
         raise ValueError(f'Name must be a non-empty string. Got: <{name}>({type(name)})')
     result = logging.getLogger(name.strip())
-    result.setLevel(_log_level(level))
+    result.basicConfig(level=_log_level(level), format=_LOGGER_FORMAT)
     return result
 
 
