@@ -246,9 +246,10 @@ def _create_dataset(
     exists_ok: Optional[bool] = True,
 ) -> bigquery.Dataset:
     _LOGGER.debug(
-        'Creating dataset <%s.%s> with labels: <%s>',
+        'Creating dataset <%s.%s>@<%s> with labels: <%s>',
         table_spec.project_id,
         table_spec.dataset_id,
+        table_spec.location,
         labels,
     )
     # Dataset obj
