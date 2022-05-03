@@ -12,7 +12,8 @@ export TARGET_PROJECT_ID="<WHERE THE SAMPLE WILL GO, NOT THE CURRENT PROJECT ID>
 export PROJECT_ID=$(gcloud config get-value core/project)
 export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format='get(projectNumber)')
 export TARGET_PROJECT_NUMBER=$(gcloud projects describe ${TARGET_PROJECT_ID} --format='get(projectNumber)')
-export LOCATION="europe-west3"
+export REGION="europe-west3"
+export LOCATION="${REGION}"
 export FUNCTION_NAME="bq-sampler"
 export FUNCTION_SA="${FUNCTION_NAME}-sa"
 export PUBSUB_CMD_TOPIC="${FUNCTION_NAME}-cmd"
@@ -21,6 +22,7 @@ export SCHEDULER_JOB_NAME="cronjob-${FUNCTION_NAME}"
 export POLICY_BUCKET_NAME="sample-policy-${PROJECT_NUMBER}"
 export REQUEST_BUCKET_NAME="sample-request-${TARGET_PROJECT_NUMBER}"
 export DEFAULT_POLICY_OBJECT_PATH="default-policy.json"
+export MONITORING_CHANNEL_NAME="${FUNCTION_NAME}-error-monitoring"
 ```
 
 ## Service Account
@@ -149,9 +151,10 @@ Deploy:
 ```bash
 gcloud functions deploy "${FUNCTION_NAME}" \
   --project="${PROJECT_ID}" \
+  --region="${REGION}" \
   --runtime="python39" \
   --entry-point="handler" \
-  --service-account "${FUNCTION_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --service-account="${FUNCTION_SA}@${PROJECT_ID}.iam.gserviceaccount.com" \
   --trigger-topic="${PUBSUB_CMD_TOPIC}" \
   --set-env-vars="${ENV_VARS_COMMA}"
 ```
@@ -160,18 +163,29 @@ gcloud functions deploy "${FUNCTION_NAME}" \
 
 ```bash
 gcloud logging read \
-  --project="${PROJECT_ID}" \
-  "resource.labels.function_name=${FUNCTION_NAME} severity>=CRITICAL"
+  "resource.labels.function_name=${FUNCTION_NAME} severity>=CRITICAL" \
+  --project="${PROJECT_ID}"
 ```
 
 ## Create code alerts
 
 ```bash
 gcloud beta monitoring channels create \
-    --description="CloudFunction ${FUNCTION_NAME} Errors" \
-    --display-name="${FUNCTION_NAME}-error-monitoring" \
-    --type=pubsub \
-    --channel-labels="topic=${PUBSUB_ERROR_TOPIC}"
+  --project="${PROJECT_ID}" \
+  --description="CloudFunction ${FUNCTION_NAME} Errors" \
+  --display-name="${MONITORING_CHANNEL_NAME}" \
+  --type="pubsub" \
+  --channel-labels="topic=projects/${PROJECT_ID}/topics/${PUBSUB_ERROR_TOPIC}"
+```
+
+Get channel full name:
+
+```bash
+MONITORING_CHANNEL_ID=$( \
+  gcloud beta monitoring channels list --format=json \
+  | jq  -r ".[] | select(.displayName == \"${FUNCTION_NAME}-error-monitoring\") | .name" \
+)
+echo "Monitoring channel ID: ${MONITORING_CHANNEL_ID}"
 ```
 
 ### Generate policies
@@ -181,15 +195,29 @@ ERROR_POLICY_JSON=`mktemp`
 sed -e "s/@@FUNCTION_NAME@@/${FUNCTION_NAME}/g" \
   ./gcp_resources/alert-function-error-policy.json.tmpl \
   > ${ERROR_POLICY_JSON}
+echo "Error policy file: ${ERROR_POLICY_JSON}"
 
 NOT_EXEC_POLICY_JSON=`mktemp`
 sed -e "s/@@FUNCTION_NAME@@/${FUNCTION_NAME}/g" \
   ./gcp_resources/alter-function-not-executed-policy.json.tmpl \
   > ${NOT_EXEC_POLICY_JSON}
+echo "Not executed policy file: ${NOT_EXEC_POLICY_JSON}"
 ```
 
 ### Apply monitoring policies
 
-```bash
+Error policy:
 
+```bash
+gcloud alpha monitoring policies create \
+  --notification-channels="${MONITORING_CHANNEL_ID}" \
+  --policy-from-file="${ERROR_POLICY_JSON}"
+```
+
+Not executed policy:
+
+```bash
+gcloud alpha monitoring policies create \
+  --notification-channels="${MONITORING_CHANNEL_ID}" \
+  --policy-from-file="${NOT_EXEC_POLICY_JSON}"
 ```
