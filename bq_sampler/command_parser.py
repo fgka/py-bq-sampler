@@ -4,11 +4,10 @@ Parses a dictionary into an instance of :py:class:`command: command.CommandBase`
 """
 from typing import Any, Dict
 
-import logging
-
 from bq_sampler.entity import command
+from bq_sampler import logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 def to_command(value: Dict[str, Any], timestamp: int) -> command.CommandBase:

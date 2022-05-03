@@ -7,7 +7,6 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 .. Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
-import logging
 from typing import Any, Callable, Dict, Generator, Mapping, Optional, Sequence, Tuple, Union
 
 import cachetools
@@ -16,9 +15,9 @@ from google.cloud import bigquery
 from google.api_core import page_iterator
 
 from bq_sampler import const
+from bq_sampler import logger
 
-
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 class _SimpleTableSpec:  # pylint: disable=too-few-public-methods

@@ -9,16 +9,15 @@ List all project IDs that should be sampled. It assumes the following structure 
                           table that overwrites the default, if valid.
 
 """
-import logging
 from typing import Any, Callable, Generator, Tuple
 
 from bq_sampler import const
 from bq_sampler.gcp import gcs
 from bq_sampler.entity import policy
 from bq_sampler.entity import table
+from bq_sampler import logger
 
-
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 def all_policies(
@@ -32,7 +31,7 @@ def all_policies(
     :param default_policy_object_path:
     :return:
     """
-    logging.info(
+    _LOGGER.info(
         'Retrieving all policies from bucket <%s> and using default policy from <%s>',
         bucket_name,
         default_policy_object_path,
@@ -48,7 +47,7 @@ def _default_policy(bucket_name: str, default_policy_object_path: str):
     result = _overwritten_policy_from_gcs(
         bucket_name, default_policy_object_path, policy.FALLBACK_GENERIC_POLICY
     )
-    logging.info(
+    _LOGGER.info(
         'Default policy read from gs://%s/%s with: %s',
         bucket_name,
         default_policy_object_path,
@@ -71,7 +70,7 @@ def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
         content = gcs.read_object(bucket_name, object_path)
         result = content.decode('utf-8')
     except Exception as err:  # pylint: disable=broad-except
-        logging.warning(
+        _LOGGER.warning(
             'Could not load content as string from <%s> in bucket <%s>. Ignoring. Error: %s',
             object_path,
             bucket_name,
@@ -135,7 +134,7 @@ def all_sample_requests(bucket_name: str) -> Generator[table.TableSample, None, 
     :param bucket_name:
     :return:
     """
-    logging.info(
+    _LOGGER.info(
         'Retrieving all sample requests from bucket <%s>',
         bucket_name,
     )

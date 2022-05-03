@@ -7,7 +7,6 @@ GCP CloudFunction mandatory entry point:
 * https://cloud.google.com/functions/docs/tutorials/pubsub
 """
 # pylint: enable=line-too-long
-import logging
 import os
 from typing import Any, Optional
 
@@ -21,8 +20,9 @@ client.setup_logging()
 import flask  # pylint: disable=wrong-import-position
 
 from bq_sampler import entry  # pylint: disable=wrong-import-position
+from bq_sampler import logger  # pylint: disable=wrong-import-position
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 def handler(  # pylint: disable=unused-argument,keyword-arg-before-vararg

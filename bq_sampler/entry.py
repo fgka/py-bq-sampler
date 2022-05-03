@@ -7,15 +7,15 @@ GCP `CloudFunction`_ entry point
 # pylint: enable=line-too-long
 from datetime import datetime
 import calendar
-import logging
 import os
 from typing import Any, Dict, Optional
 
 from bq_sampler import process_request
 from bq_sampler import command_parser
 from bq_sampler.gcp import pubsub
+from bq_sampler import logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 def handler(  # pylint: disable=unused-argument

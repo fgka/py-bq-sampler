@@ -8,7 +8,6 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 """
 # pylint: enable=line-too-long
 import math
-import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from google.cloud import bigquery
@@ -16,9 +15,9 @@ from google.cloud import bigquery
 from bq_sampler import const
 from bq_sampler.entity import table
 from bq_sampler.gcp import bq
+from bq_sampler import logger
 
-
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 _BQ_VALID_SORTING: List[str] = [const.BQ_ORDER_BY_ASC, const.BQ_ORDER_BY_DESC]
 

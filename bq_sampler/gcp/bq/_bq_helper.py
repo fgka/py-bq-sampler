@@ -7,7 +7,6 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 .. Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
-import logging
 from typing import Callable, Dict, Generator, Optional
 
 import cachetools
@@ -16,8 +15,9 @@ from google.cloud import bigquery
 
 from bq_sampler import const
 from bq_sampler.gcp.bq import _bq_base
+from bq_sampler import logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 """
 Default GCP resource label to be applied table created here.

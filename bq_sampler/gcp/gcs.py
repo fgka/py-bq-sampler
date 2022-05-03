@@ -6,15 +6,15 @@ Reads an object from `Cloud Storage`_.
 .. Cloud Storage: https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/read-write-to-cloud-storage
 """
 # pylint: enable=line-too-long
-import logging
 from typing import Callable, Generator, Optional
 
 import cachetools
 
 from google.cloud import storage
 
+from bq_sampler import logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 
 class CloudStorageDownloadError(Exception):

@@ -2,7 +2,6 @@
 """
 Processes a request coming from Cloud Function.
 """
-import logging
 import os
 import time
 
@@ -11,8 +10,9 @@ import cachetools
 from bq_sampler.entity import command, table, policy
 from bq_sampler import sampler_bucket, sampler_query
 from bq_sampler.gcp import pubsub
+from bq_sampler import logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logger.get(__name__)
 
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'

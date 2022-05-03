@@ -7,14 +7,15 @@ Manages PubSub boilerplate. How to parse the data and publish it.
 import base64
 from concurrent import futures
 import json
-import logging
 from typing import Any, Dict, Union
 
 import cachetools
 
 from google.cloud import pubsub_v1
 
-_LOGGER = logging.getLogger(__name__)
+from bq_sampler import logger
+
+_LOGGER = logger.get(__name__)
 
 
 def parse_json_data(value: Union[str, bytes]) -> Any:
