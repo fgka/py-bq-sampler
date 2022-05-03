@@ -47,9 +47,10 @@ def handler(  # pylint: disable=unused-argument
         _handler(event, context)
     except Exception as err:
         msg = (
-            f'Could not process event: <{event}>,'
+            f'[{__name__}] Could not process event: <{event}>,'
             f' context: <{context}>,'
-            f' and environment: <{os.environ}>'
+            f' and environment: <{os.environ}>. '
+            f'Error: {err}'
         )
         _LOGGER.critical(msg)
         raise RuntimeError(msg) from err
