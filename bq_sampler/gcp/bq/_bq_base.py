@@ -47,7 +47,7 @@ class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
             except Exception as err:
                 raise ValueError(
                     _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
-                        'enough tokens', table_fqn_id
+                        'enough tokens including location', table_fqn_id
                     )
                 ) from err
         try:
@@ -57,7 +57,7 @@ class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
         except Exception as err:
             raise ValueError(
                 _SimpleTableSpec._BREAK_DOWN_TABLE_FQN_ID_ERROR_MSG_TMPL.format(
-                    'enough tokens', table_fqn_id
+                    'enough tokens without location', table_fqn_id
                 )
             ) from err
         if not project_id:
@@ -105,9 +105,12 @@ def table(*, table_fqn_id: str) -> bigquery.Table:
     :return:
     """
     # validate input
+    _LOGGER.debug(f'Retrieving table metadata for <%s>', table_fqn_id)
     table_spec = _SimpleTableSpec(table_fqn_id)
     # logic
-    return _table(table_spec)
+    result = _table(table_spec)
+    _LOGGER.debug(f'Retrieved table metadata for <%s> = %s', table_fqn_id, result)
+    return result
 
 
 def _table(table_spec: _SimpleTableSpec) -> bigquery.Table:
@@ -149,6 +152,7 @@ def query_job(
     .. docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
     """
     # validate input
+    _LOGGER.debug('Issuing query job for query <%s> in project <%s>@<%s>', query, project_id, location)
     query = _stripped_str_arg('query', query)
     project_id = _stripped_str_arg('project_id', project_id, True)
     location = _stripped_str_arg('location', location, True)
@@ -218,6 +222,7 @@ def create_table(
     if drop_table_before:
         drop_table(table_fqn_id=table_fqn_id, not_found_ok=True)
     _create_table(dataset, table_spec, schema, labels, exists_ok=not drop_table_before)
+    _LOGGER.debug('Created table <%s> with labels: <%s>', table_fqn_id, labels)
 
 
 def _validate_table_labels(labels: Optional[Dict[str, str]] = None) -> str:
@@ -333,9 +338,11 @@ def drop_table(*, table_fqn_id: str, not_found_ok: Optional[bool] = True) -> Non
     :return:
     """
     # validate input
+    _LOGGER.debug('Dropping table <%s> with not found ok <%s>', table_fqn_id, not_found_ok)
     table_spec = _SimpleTableSpec(table_fqn_id)
     # logic
     _drop_table(bigquery.Table(table_spec.table_id_only), not_found_ok, table_spec.location)
+    _LOGGER.debug('Dropped table <%s> with not found ok <%s>', table_fqn_id, not_found_ok)
 
 
 def _drop_table(
@@ -368,6 +375,7 @@ def list_all_tables_with_filter(
     :return:
     """
     # validate input
+    _LOGGER.debug('Listing tables with filter in project <%s>@<%s>', project_id, location)
     project_id = _stripped_str_arg('project_id', project_id, True)
     location = _stripped_str_arg('location', location, True)
     if not callable(filter_fn):

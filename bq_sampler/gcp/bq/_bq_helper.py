@@ -36,9 +36,11 @@ def row_count(*, table_fqn_id: str) -> int:
     :param table_fqn_id: in the format `<PROJECT_ID>.<DATASET_ID>.<TABLE_ID>[@<LOCATION>]`.
     :return:
     """
-    _LOGGER.debug('Reading table size from :<%s>', table_fqn_id)
+    _LOGGER.debug('Reading table size from <%s>', table_fqn_id)
     table = _bq_base.table(table_fqn_id=table_fqn_id)
-    return table.num_rows
+    result = table.num_rows
+    _LOGGER.debug('Table <%s> has %d rows', table_fqn_id, result)
+    return result
 
 
 def query_job_result(
@@ -58,6 +60,7 @@ def query_job_result(
     :param location:
     :return:
     """
+    _LOGGER.debug('Issuing query job results for query <%s> in project <%s>@<%s>', query, project_id, location)
     job = _bq_base.query_job(
         query=query, job_config=job_config, project_id=project_id, location=location
     )
@@ -67,6 +70,7 @@ def query_job_result(
         raise RuntimeError(
             f'Could not retrieve results from query <{job.query}>. Error: {err}'
         ) from err
+    _LOGGER.debug('Issued query job results for query <%s> in project <%s>@<%s>', query, project_id, location)
     return result
 
 
@@ -82,15 +86,16 @@ def drop_all_tables_by_labels(
     :return:
     """
     # validate input
+    _LOGGER.debug('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
     labels = _validate_table_labels(labels)
     # logic
-    _LOGGER.debug('Dropping all tables in project <%s> with labels <%s>', project_id, labels)
     filter_fn = _has_table_labels_fn(labels)
     _drop_all_tables_in_iter(
         _bq_base.list_all_tables_with_filter(
             project_id=project_id, location=location, filter_fn=filter_fn
         )
     )
+    _LOGGER.debug('Dropped all tables in project <%s> with labels <%s>', project_id, labels)
 
 
 def _validate_table_labels(labels: Optional[Dict[str, str]] = None) -> Dict[str, str]:

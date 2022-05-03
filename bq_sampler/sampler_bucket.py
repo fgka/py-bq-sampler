@@ -195,6 +195,5 @@ def _json_object_path(table_reference: table.TableReference) -> str:
             table_reference.project_id,
             table_reference.dataset_id,
             table_reference.table_id,
-            const.JSON_EXT,
         ]
-    )
+    ) + const.JSON_EXT

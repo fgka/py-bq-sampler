@@ -59,7 +59,7 @@ def publish(value: Dict[str, Any], topic_path: str) -> None:
     _LOGGER.debug('Publishing data <%s> into topic <%s>', value, topic_path)
     json_str = json.dumps(value)
     data = json_str.encode('utf-8')
-    publish_future = _client().publish(data, topic_path)
+    publish_future = _client().publish(topic_path, data)
     futures.wait([publish_future], return_when=futures.ALL_COMPLETED)
     _LOGGER.debug('Published data <%s> into topic <%s>', value, topic_path)
 

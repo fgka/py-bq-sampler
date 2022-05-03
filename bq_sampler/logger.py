@@ -11,7 +11,7 @@ import logging
 import os
 from typing import Optional, Union
 
-LOG_LEVEL_ENV_VAR_NAME: str = 'LOG_LEVEL'
+LOG_LEVEL_ENV_VAR_NAME: str = 'LOG_LEVEL'  # DEBUG or WARNING, etc
 _DEFAULT_LOG_LEVEL: int = logging.INFO
 _LOGGER_FORMAT: str = '[%(asctime)s %(filename)s.%(funcName)s:%(lineno)s]%(levelname)s: %(message)s'
 
@@ -57,9 +57,10 @@ def _log_level(level: Optional[Union[str, int]]) -> int:
 def _create_logger(name: str, level: int) -> logging.Logger:
     result = logging.getLogger(name.strip())
     result.setLevel(level)
-    formatter = logging.Formatter(_LOGGER_FORMAT)
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    handler.setFormatter(formatter)
-    result.addHandler(handler)
+    if level == logging.DEBUG:
+        formatter = logging.Formatter(_LOGGER_FORMAT)
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        handler.setFormatter(formatter)
+        result.addHandler(handler)
     return result
