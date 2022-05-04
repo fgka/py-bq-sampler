@@ -1,0 +1,15 @@
+{
+  "__doc__": "Full sample request against a full policy specification",
+  "__table_source__": "bigquery-public-data.new_york_taxi_trips.tlc_green_trips_2016",
+  "size": {
+    "count": 3000,
+    "percentage": 11.7
+  },
+  "spec": {
+    "type": "sorted",
+    "properties": {
+      "by": "dropoff_datetime",
+      "direction": "DESC"
+    }
+  }
+}

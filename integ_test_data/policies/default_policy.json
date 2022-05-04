@@ -1,0 +1,16 @@
+{
+  "__doc__": "The general policy",
+  "limit": {
+    "count": 10,
+    "percentage": 3.0
+  },
+  "default_sample": {
+    "size": {
+      "count": 3,
+      "percentage": 1.0
+    },
+    "spec": {
+      "type": "random"
+    }
+  }
+}

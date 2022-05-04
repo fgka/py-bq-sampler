@@ -27,8 +27,8 @@ python -m bq_sampler sample-request --help
 ```bash
 python -m bq_sampler sample-request \
   --default test_data/policy_bucket/default_policy.json \
-  --policy test_data/policy_bucket/project_id_a/dataset_id_a/non_json.json \
-  --request test_data/request_bucket/project_id_a/dataset_id_a/non_json.json \
+  --policy test_data/policy_bucket/project_id_a/dataset_id_a/non_json_policy.json \
+  --request test_data/request_bucket/project_id_a/dataset_id_a/non_json_policy.json \
   --size 10
 ```
 

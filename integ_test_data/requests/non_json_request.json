@@ -1,0 +1,14 @@
+{
+  "__doc__": "NON JSON file, percentage is not quoted. Should be loaded as empty",
+  "size": {
+    "count": 17,
+    percentage: 11.1
+  },
+  "spec": {
+    "type": "sorted",
+    "properties": {
+      "by": "TEST_COLUMN_B",
+      "direction": "ASC"
+    }
+  }
+}

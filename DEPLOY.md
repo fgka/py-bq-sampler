@@ -52,3 +52,5 @@ gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
   --location="${LOCATION}"
 ```
+
+## [Integration Tests](INTEG_TESTING.md)

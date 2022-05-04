@@ -1,0 +1,21 @@
+{
+  "__doc__": "Redefines each attribute in the general policy",
+  "__table_source__": "bigquery-public-data.new_york_taxi_trips.tlc_fhv_trips_2015",
+  "limit": {
+    "count": 1234,
+    "percentage": 35.1
+  },
+  "default_sample": {
+    "size": {
+      "count": 9,
+      "percentage": 6.5
+    },
+    "spec": {
+      "type": "sorted",
+      "properties": {
+        "by": "pickup_datetime",
+        "direction": "ASC"
+      }
+    }
+  }
+}

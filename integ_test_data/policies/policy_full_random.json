@@ -1,0 +1,16 @@
+{
+  "__doc__": "Redefines each attribute in the general policy",
+  "limit": {
+    "count": 300000,
+    "percentage": 40.1
+  },
+  "default_sample": {
+    "size": {
+      "count": 9,
+      "percentage": 6.5
+    },
+    "spec": {
+      "type": "random"
+    }
+  }
+}

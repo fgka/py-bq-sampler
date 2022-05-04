@@ -16,6 +16,10 @@ brew install python3
 
 ## [Infrastructure](INFRASTRUCTURE.md)
 
+### [Deploy](DEPLOY.md)
+
+### [Integration Tests](INTEG_TESTING.md)
+
 ## Install
 
 ```bash
@@ -23,3 +27,4 @@ python3 ./setup.py install
 ```
 
 ## [CLI usage](CLI_USAGE.md)
+

@@ -1,10 +1,10 @@
 {
-  "__doc__": "The general policy",
+  "__doc__": "The attribute default_sample is bad JSON, does not have the quotes around it",
   "limit": {
     "count": 1000,
     "percentage": 30.1
   },
-  "default_sample": {
+  default_sample: {
     "size": {
       "count": 10,
       "percentage": 5.5

@@ -200,3 +200,5 @@ gcloud alpha monitoring policies create \
   --notification-channels="${MONITORING_CHANNEL_ID}" \
   --policy-from-file="${NOT_EXEC_POLICY_JSON}"
 ```
+
+## [Integration Tests](INTEG_TESTING.md)
