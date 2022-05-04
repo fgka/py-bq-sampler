@@ -210,3 +210,21 @@ def _json_object_path(table_reference: table.TableReference) -> str:
         )
         + const.JSON_EXT
     )
+
+
+def is_sampling_lock_present(bucket_name: str, sampling_lock_object_path: str) -> bool:
+    """
+    Just verify if the object exists and returns :py:obj:`True` if it does.
+    The content is irrelevant.
+
+    :param bucket_name:
+    :param sampling_lock_object_path:
+    :return:
+    """
+    _LOGGER.info(
+        'Verifying sampling lock object existence in bucket <%s> and path <%s>',
+        bucket_name,
+        sampling_lock_object_path,
+    )
+    obj_content = _fetch_gcs_object_as_string(bucket_name, sampling_lock_object_path)
+    return obj_content is not None

@@ -22,6 +22,7 @@ export SCHEDULER_JOB_NAME="cronjob-${FUNCTION_NAME}"
 export POLICY_BUCKET_NAME="sample-policy-${PROJECT_NUMBER}"
 export REQUEST_BUCKET_NAME="sample-request-${TARGET_PROJECT_NUMBER}"
 export DEFAULT_POLICY_OBJECT_PATH="default-policy.json"
+export DEFAULT_SAMPLING_LOCK_OBJECT_PATH="block-sampling"
 export MONITORING_CHANNEL_NAME="${FUNCTION_NAME}-error-monitoring"
 ```
 
@@ -122,12 +123,14 @@ gcloud pubsub topics create "${PUBSUB_ERROR_TOPIC}" \
 
 ## Create Cloud Scheduler
 
+Set to run every day at 23:00 UTC:
+
 ```bash
 gcloud beta scheduler jobs create pubsub ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
   --location="${LOCATION}" \
   --topic="${PUBSUB_CMD_TOPIC}" \
-  --schedule="0 8 * * *" \
+  --schedule="0 23 * * *" \
   --time-zone="Etc/UTC" \
   --message-body='{"type": "START"}' \
   --description="Cronjob to trigger BigQuery sampling to DataScience Environment"

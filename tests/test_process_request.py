@@ -15,6 +15,7 @@ from tests.entity import sample_policy_data, command_test_data
 from tests.gcp import gcs_on_disk
 
 _GENERAL_POLICY_PATH: str = 'default_policy.json'
+_SAMPLING_LOCK_PATH: str = 'lock_sampling'
 
 
 class _StubGeneralConfig:
@@ -26,6 +27,7 @@ class _StubGeneralConfig:
         self.request_bucket = None
         self.pubsub_request = None
         self.pubsub_error = None
+        self.sampling_lock_path = None
 
 
 @pytest.mark.parametrize(
@@ -116,11 +118,12 @@ def test__process_start_ok(monkeypatch):
     cmd = command_test_data.TEST_COMMAND_START
     config = _StubGeneralConfig()
     config.location = 'TEST_LOCATION'
-    config.default_policy_path = 'DEFAULT_POLICY_PATH'
+    config.default_policy_path = _GENERAL_POLICY_PATH
     config.policy_bucket = 'POLICY_BUCKET'
     config.request_bucket = 'REQUEST_BUCKET'
     config.target_project_id = 'TARGET_PROJECT_ID'
     config.pubsub_request = 'PUBSUB_REQUEST'
+    config.sampling_lock_path = _SAMPLING_LOCK_PATH
     sample_start_req_lst: List[command.CommandSampleStart] = []
 
     def mocked_publish(value: Dict[str, Any], topic_path: str) -> str:
@@ -141,6 +144,30 @@ def test__process_start_ok(monkeypatch):
     assert len(sample_start_req_lst) == 6
     for start_req in sample_start_req_lst:
         assert start_req.target_table.project_id == config.target_project_id
+
+
+def test__process_start_nok_sampling_lock_exists(monkeypatch):
+    # Given
+    cmd = command_test_data.TEST_COMMAND_START
+    config = _StubGeneralConfig()
+    config.location = 'TEST_LOCATION'
+    config.request_bucket = 'REQUEST_BUCKET'
+    config.sampling_lock_path = _SAMPLING_LOCK_PATH
+    called = False
+
+    def mocked_read_object(bucket_name: str, path: str) -> bytes:
+        nonlocal called
+        assert bucket_name == config.request_bucket
+        assert path == config.sampling_lock_path
+        called = True
+        return bytes(''.encode('utf-8'))
+
+    _mock_general_config(monkeypatch, config)
+    monkeypatch.setattr(process_request.sampler_bucket.gcs, 'read_object', mocked_read_object)
+    # When/Then
+    with pytest.raises(InterruptedError):
+        process_request._process_start(cmd)
+    assert called
 
 
 def test__create_sample_done_request_ok():

@@ -23,6 +23,8 @@ _PUBSUB_CMD_TOPIC_ENV_VAR: str = 'CMD_TOPIC_NAME'  # projects/py-project-12345/t
 _PUBSUB_ERROR_TOPIC_ENV_VAR: str = (
     'ERROR_TOPIC_NAME'  # projects/py-project-12345/topics/error-topic-name
 )
+_SAMPLING_LOCK_OBJECT_PATH_ENV_VAR: str = 'SAMPLING_LOCK_OBJECT_PATH'  # block-sampling
+_DEFAULT_SAMPLING_LOCK_OBJECT_PATH: str = 'block-sampling'
 
 _PUBSUB_ERROR_CMD_ENTRY: str = 'command'
 _PUBSUB_ERROR_MSG_ENTRY: str = 'error'
@@ -37,6 +39,9 @@ class _GeneralConfig:
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
+        self._sampling_lock_path = os.environ.get(
+            _SAMPLING_LOCK_OBJECT_PATH_ENV_VAR, _DEFAULT_SAMPLING_LOCK_OBJECT_PATH
+        )
 
     @property
     def location(self) -> str:  # pylint: disable=missing-function-docstring
@@ -66,6 +71,10 @@ class _GeneralConfig:
     def pubsub_error(self) -> str:  # pylint: disable=missing-function-docstring
         return self._pubsub_error
 
+    @property
+    def sampling_lock_path(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._sampling_lock_path
+
 
 def process(cmd: command.CommandBase) -> None:
     """
@@ -74,7 +83,7 @@ def process(cmd: command.CommandBase) -> None:
     :param cmd:
     :return:
     """
-    _LOGGER.debug('Processing command <%s>', cmd)
+    _LOGGER.info('Processing command <%s>', cmd)
     try:
         _process(cmd)
         _LOGGER.debug('Processed command <%s>', cmd)
@@ -109,6 +118,21 @@ def _process_start(cmd: command.CommandStart) -> None:
     :param cmd:
     :return:
     """
+    if sampler_bucket.is_sampling_lock_present(
+        _general_config().request_bucket, _general_config().sampling_lock_path
+    ):
+        gcs_url = f'gs://{_general_config().request_bucket}/{_general_config().sampling_lock_path}'
+        _LOGGER.warning(
+            'Sampling is being locked by object <%s>. Sampling is being skipped', gcs_url
+        )
+        raise InterruptedError(
+            f'Sampling interrupted by presence of <{gcs_url}>. Remove to re-enable sampling.'
+        )
+    else:
+        _process_start_ok(cmd)
+
+
+def _process_start_ok(cmd: command.CommandStart) -> None:
     _LOGGER.debug('Retrieving all policies from bucket <%s>', _general_config().policy_bucket)
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
