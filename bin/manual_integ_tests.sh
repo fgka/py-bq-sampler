@@ -466,6 +466,31 @@ function table_id_from_path
     echo "${PRJ_ID}:${DATASET_ID}.${TABLE_ID}"
 }
 
+function wait_for_function
+{
+    echo "Monitor function execution at:"
+    echo "  https://console.cloud.google.com/functions/details/${REGION}/${FUNCTION_NAME}?project=${PROJECT_ID}"
+    read -n 1 -p "Once the function finished executing, press <ENTER>:" TO_IGNORE
+}
+
+function wait_for_big_query
+{
+    local TBL_ID=${1}
+
+    if [ -z "${TBL_ID}" ]
+    then
+        log_error "No table given for BigQuery table details"
+        exit -1
+    fi
+    local TBL_PRJ_ID="${TBL_ID%%:*}"
+    local TBL_DS_ID="${TBL_ID##*:}"
+    local TBL_TBL_ID="${TBL_DS_ID##*.}"
+    TBL_DS_ID="${TBL_DS_ID%%.*}"
+    echo "Check BigQuery state at:"
+    echo "  https://console.cloud.google.com/bigquery?project=${PROJECT_ID}&ws=!1m5!1m4!4m3!1s${TBL_PRJ_ID}!2s${TBL_DS_ID}!3s${TBL_TBL_ID}"
+    read -n 1 -p "Once you've checked, press <ENTER>:" TO_IGNORE
+}
+
 ### GCS
 
 function clear_bucket
@@ -611,9 +636,9 @@ function _delete_big_query_dataset
 
 function _drop_big_query_table
 {
-    local TABLE_ID=${1}
+    local TBL_ID=${1}
 
-    exec_cmd "bq --location ${LOCATION} rm -f ${TABLE_ID}"
+    exec_cmd "bq --location ${LOCATION} rm -f ${TBL_ID}"
 }
 
 function _list_all_tables_in_dataset
@@ -623,6 +648,34 @@ function _list_all_tables_in_dataset
     # format: <PRJ>:<DS>.<TBL>
     exec_cmd_out "bq --location ${LOCATION} --format json ls ${DATASET_ID}" \
         | jq -c -r '.[].id'
+}
+
+function big_query_rename_table
+{
+    local TBL_ID=${1}
+    local TBL_NEW_ID=${2}
+
+    if [ -z "${TBL_ID}" ]
+    then
+        log_error "No table given for BigQuery table renaming"
+        exit -1
+    fi
+    if [ -z "${TBL_NEW_ID}" ]
+    then
+        log_error "No table given for BigQuery table renaming"
+        exit -1
+    fi
+    log_info "Renaming table ${TBL_ID} into ${TBL_NEW_ID}"
+    _big_query_copy_table "${TBL_ID}" "${TBL_NEW_ID}"
+    _drop_big_query_table "${TBL_ID}"
+}
+
+function _big_query_copy_table
+{
+    local TBL_ID=${1}
+    local TBL_NEW_ID=${2}
+
+    exec_cmd "bq --location ${LOCATION} cp ${TBL_ID} ${TBL_NEW_ID}"
 }
 
 function big_query_table_details
@@ -755,16 +808,18 @@ function function_logs
 ###############################################################
 
 ###############################################################
-# Setup:
-# - All is deployed;
-# - There is the trigger in place;
-# - The two buckets (policy and request) are completely empty.
-# - One exception: there is the general policy file.
-# - [DEMO] Show the default/general policy file and where it is located;
-# - [DEMO] Show that there are no tables copied;
-# - [DEMO] Show the empty requests bucket.
 function clean_up
 {
+    log_info "###############################################################"
+	log_info "# Setup:"
+	log_info "# - All is deployed;"
+	log_info "# - There is the trigger in place;"
+	log_info "# - The two buckets (policy and request) are completely empty."
+	log_info "# - One exception: there is the general policy file."
+	log_info "# - [DEMO] Show the default/general policy file and where it is located;"
+	log_info "# - [DEMO] Show that there are no tables copied;"
+	log_info "# - [DEMO] Show the empty requests bucket."
+    log_info "###############################################################"
     log_info "Cleaning up demo: emptying buckets and target tables"
     clear_bucket "${POLICY_BUCKET_NAME}"
     clear_bucket "${REQUEST_BUCKET_NAME}"
@@ -773,119 +828,162 @@ function clean_up
     upload_file "${POLICY_BUCKET_NAME}" "${POLICY_OBJECT_PATH}" "${POLICY_DEFAULT}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
 
 ###############################################################
-# In the beginning:
-# - [STORY] As a Scientist I need a table sample;
-# - [DEMO] Navigate to the project/data set/table (to show the path) that is needed;
-# - [DEMO] Create an empty POLICY file on the policy bucket;
-# - [DEMO] Show the default policy applied to the specific table on the DS Env.
 function first_empty_policy
 {
+    log_info "###############################################################"
+	log_info "# In the beginning:"
+	log_info "# - [STORY] As a Scientist I need a table sample;"
+	log_info "# - [DEMO] Navigate to the project/data set/table (to show the path) that is needed;"
+	log_info "# - [DEMO] Create an empty POLICY file on the policy bucket;"
+	log_info "# - [DEMO] Show the default policy applied to the specific table on the DS Env."
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
     log_info "Adding empty policy: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_EMPTY}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
 
 ###############################################################
-# Well I need something different:
-# - [STORY] As a Scientist I'm not happy with the current sample;
-# - [DEMO] Navigate into the REQUEST bucket and put a different request (that is beyond what the current general sample says);
-# - [DEMO] Show that the request did fail, since the general policy does cap it;
 function request_not_compliant
 {
+    log_info "###############################################################"
+	log_info "# Well I need something different:"
+	log_info "# - [STORY] As a Scientist I'm not happy with the current sample;"
+	log_info "# - [DEMO] Navigate into the REQUEST bucket and put a different request (that is beyond what the current general sample says);"
+	log_info "# - [DEMO] Show that the request did fail, since the general policy does cap it;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
     log_info "Adding request violating policy limits: ${TARGET}"
     upload_file "${REQUEST_BUCKET_NAME}" "${TARGET}" "${REQUEST_FULL_RANDOM}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] Wait, I asked for but did not get, what now?
-# - [DEMO] Create a specific policy on the POLICY bucket which allows a bigger/different sample;
-# - [DEMO] Show that with the specific policy the request can be fulfil (show the new sample in BQ);
+
 function policy_for_request_compliance
 {
+    log_info "###############################################################"
+	log_info "# - [STORY] Wait, I asked for but did not get, what now?"
+	log_info "# - [DEMO] Create a specific policy on the POLICY bucket which allows a bigger/different sample;"
+	log_info "# - [DEMO] Show that with the specific policy the request can be fulfil (show the new sample in BQ);"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
     log_info "Adding policy to allow requested sample: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
 
 
 ###############################################################
-# I need another table:
-# - [STORY] As a Scientist I need a new table (and I already know that I need the policy first);
-# - [DEMO] Create a non-empty POLICY file but corrupt (preferably a JSON invalid file);
-# - [DEMO] Show that although the file is corrupt, the general policy applies (assumes the invalid file as an empty file) and the general sample is delivered;
 function invalid_policy_json
 {
+    log_info "###############################################################"
+	log_info "# I need another table:"
+	log_info "# - [STORY] As a Scientist I need a new table (and I already know that I need the policy first);"
+	log_info "# - [DEMO] Create a non-empty POLICY file but corrupt (preferably a JSON invalid file);"
+	log_info "# - [DEMO] Show that although the file is corrupt, the general policy applies (assumes the invalid file as an empty file) and the general sample is delivered;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_NON_JSON_PATH}"
     log_info "Adding non-json policy: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${PROJECT_ID}/${POLICY_NON_JSON_PATH}" "${POLICY_NON_JSON}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] Let us fix the mistake on the POLICY;
-# - [DEMO] Fix the file and show that the, specific, POLICY sample applies;
-# - [STORY] Let us fix the mistake on the POLICY;
+
 function fix_invalid_policy_json
 {
+    log_info "###############################################################"
+	log_info "# - [STORY] Let us fix the mistake on the POLICY;"
+	log_info "# - [DEMO] Fix the file and show that the, specific, POLICY sample applies;"
+	log_info "# - [STORY] Let us fix the mistake on the POLICY;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_NON_JSON_PATH}"
     log_info "Fixing non-json policy: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] Let me now, create my specific request;
-# - [DEMO] Create a faulty request file (again, corrupt JSON or wrong schema is the best);
-# - [DEMO] Show that still what is valid is the POLICY sample and not the request;
+
 function invalid_request_json
 {
+    log_info "###############################################################"
+	log_info "# - [STORY] Let me now, create my specific request;"
+	log_info "# - [DEMO] Create a faulty request file (again, corrupt JSON or wrong schema is the best);"
+	log_info "# - [DEMO] Show that still what is valid is the POLICY sample and not the request;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
-    log_info "Adding request violating policy limits: ${TARGET}"
+    log_info "Adding non-json request: ${TARGET}"
     upload_file "${REQUEST_BUCKET_NAME}" "${TARGET}" "${REQUEST_NON_JSON}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] Let me fix the request;
-# - [DEMO] Fix the request file;
-# - [DEMO] Show that the request applies.
+
+function fix_invalid_request_json
+{
+    log_info "###############################################################"
+	log_info "# - [STORY] Let me fix the request;"
+	log_info "# - [DEMO] Fix the request file;"
+	log_info "# - [DEMO] Show that the request applies."
+    log_info "###############################################################"
+    local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
+    log_info "Fixing non-json request: ${TARGET}"
+    upload_file "${REQUEST_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
+    trigger_function
+    show_content
+    log_info "###############################################################"
+}
 
 ###############################################################
-# I don't need the request anymore:
-# - [STORY] As a Scientist, I don't need as much data anymore on this table;
-# - [DEMO] Remove the request file and show that the POLICY or general policy is the new sample;
 function request_removal_default_sample
 {
+    log_info "###############################################################"
+	log_info "# I don't need the request anymore:"
+	log_info "# - [STORY] As a Scientist, I don't need as much data anymore on this table;"
+	log_info "# - [DEMO] Remove the request file and show that the POLICY or general policy is the new sample;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
     log_info "Adding a new table but with invalid policy: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_NON_JSON}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] My bad, I don't need the table anymore;
-# - [DEMO] Remove the policy file entirely;
-# - [DEMO] Show that the sample table disappears.
+
 function policy_removal
 {
+    log_info "###############################################################"
+	log_info "# - [STORY] My bad, I don't need the table anymore;"
+	log_info "# - [DEMO] Remove the policy file entirely;"
+	log_info "# - [DEMO] Show that the sample table disappears."
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
     log_info "Removing invalid policy: ${TARGET}"
     delete_object "${POLICY_BUCKET_NAME}" "${TARGET}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
 
 ###############################################################
-# Wait there is a new schema in PROD:
-# - [STORY] In PROD there is a new column for table;
-# - [DEMO] Add a new column to a sampled table;
-# - [DEMO] Show that the sample table now contains the new column;
 function source_schema_change_overwrites_local
 {
+    log_info "###############################################################"
+	log_info "# Wait there is a new schema in PROD:"
+	log_info "# - [STORY] In PROD there is a new column for table;"
+	log_info "# - [DEMO] Add a new column to a sampled table;"
+	log_info "# - [DEMO] Show that the sample table now contains the new column;"
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
     log_info "Adding table policy: ${TARGET}"
     upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
@@ -895,25 +993,42 @@ function source_schema_change_overwrites_local
     log_info "Changing sample table schema: ${BQ_TABLE_ID}"
     big_query_table_add_column "${BQ_TABLE_ID}" "column_in_sample_table"
     show_content
+    wait_for_big_query "${BQ_TABLE_ID}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [STORY] The PROD table has been removed (but the policies/requests are still there);
-# - [DEMO] Remove a PROD table;
-# - [DEMO] Show that the sample table disappears.
+
 function source_table_removed
 {
-    # TODO create a new table with content, create a policy, trigger, remove table, trigger
-    echo "NOT IMPLEMENTED"
-    exit -1
+    log_info "###############################################################"
+	log_info "# - [STORY] The PROD table has been removed (but the policies/requests are still there);"
+	log_info "# - [DEMO] Remove a PROD table;"
+	log_info "# - [DEMO] Show that the sample table disappears."
+    log_info "###############################################################"
+    local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
+    log_info "Creating policy and sample for: ${TARGET}"
+    upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
+    trigger_function
+    show_content
+    local BQ_TABLE_ID=$(table_id_from_path "${PROJECT_ID}" "${POLICY_FULL_RANDOM_PATH}")
+    local BQ_TABLE_NEW_ID="${BQ_TABLE_ID}_cloned"
+    big_query_rename_table "${BQ_TABLE_ID}" "${BQ_TABLE_NEW_ID}"
+    wait_for_big_query "${BQ_TABLE_ID}"
+    trigger_function
+    show_content
+    big_query_rename_table "${BQ_TABLE_NEW_ID}" "${BQ_TABLE_ID}"
+    log_info "###############################################################"
 }
 
 ###############################################################
-# I need more time with this table:
-# - [STORY] As a Scientist I need table data for multiple days;
-# - [DEMO] Put the lock file in place (to interrupt all sampling);
 function lock_sampling
 {
+    log_info "###############################################################"
+	log_info "# I need more time with this table:"
+	log_info "# - [STORY] As a Scientist I need table data for multiple days;"
+	log_info "# - [DEMO] Put the lock file in place (to interrupt all sampling);"
+    log_info "###############################################################"
     log_info "Locking sample"
     upload_file "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}" "${POLICY_EMPTY}"
     trigger_function
@@ -921,14 +1036,18 @@ function lock_sampling
     delete_object "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
-# - [DEMO] Change a table schema (by adding a column);
-# - [DEMO] Show that the new schema is not applied, since the lock is in place;
-# - [STORY] Ok, I'm done;
-# - [DEMO] Remove the lock file;
-# - [DEMO] Show that the column is now in the sample table.
+
 function source_schema_change_during_lock
 {
+    log_info "###############################################################"
+	log_info "# - [DEMO] Change a table schema (by adding a column);"
+	log_info "# - [DEMO] Show that the new schema is not applied, since the lock is in place;"
+	log_info "# - [STORY] Ok, I'm done;"
+	log_info "# - [DEMO] Remove the lock file;"
+	log_info "# - [DEMO] Show that the column is now in the sample table."
+    log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_SORTED_PATH}"
     log_info "Locking sample and changing schema in ${TARGET}"
     upload_file "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}" "${POLICY_EMPTY}"
@@ -936,6 +1055,7 @@ function source_schema_change_during_lock
     log_info "Adding column to source table schema: ${BQ_TABLE_ID}"
     big_query_table_add_column "${BQ_TABLE_ID}" "column_in_source_table"
     show_content
+    wait_for_big_query "${BQ_TABLE_ID}"
     trigger_function
     show_content
     delete_object "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}"
@@ -944,8 +1064,10 @@ function source_schema_change_during_lock
     log_info "Removing column from source table schema: ${BQ_TABLE_ID}"
     big_query_table_drop_column "${BQ_TABLE_ID}" "column_in_source_table"
     show_content
+    wait_for_big_query "${BQ_TABLE_ID}"
     trigger_function
     show_content
+    log_info "###############################################################"
 }
 
 ###############################################################
@@ -969,16 +1091,18 @@ function main
         deploy_function
     fi
     clean_up
-    # run tests
+    run tests
     first_empty_policy
     request_not_compliant
     policy_for_request_compliance
     invalid_policy_json
     fix_invalid_policy_json
     invalid_request_json
+    fix_invalid_request_json
     request_removal_default_sample
     policy_removal
     source_schema_change_overwrites_local
+    source_table_removed
     lock_sampling
     source_schema_change_during_lock
 }

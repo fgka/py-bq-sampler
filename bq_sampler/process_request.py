@@ -30,7 +30,7 @@ _PUBSUB_ERROR_CMD_ENTRY: str = 'command'
 _PUBSUB_ERROR_MSG_ENTRY: str = 'error'
 
 
-class _GeneralConfig:
+class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
     def __init__(self):
         self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
@@ -128,11 +128,14 @@ def _process_start(cmd: command.CommandStart) -> None:
         raise InterruptedError(
             f'Sampling interrupted by presence of <{gcs_url}>. Remove to re-enable sampling.'
         )
-    else:
-        _process_start_ok(cmd)
+    _process_start_ok(cmd)
 
 
 def _process_start_ok(cmd: command.CommandStart) -> None:
+    _LOGGER.debug('Dropping all sample tables in <%s>', _general_config().target_project_id)
+    sampler_query.drop_all_sample_tables(
+        project_id=_general_config().target_project_id, location=_general_config().location
+    )
     _LOGGER.debug('Retrieving all policies from bucket <%s>', _general_config().policy_bucket)
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,

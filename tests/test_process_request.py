@@ -18,7 +18,7 @@ _GENERAL_POLICY_PATH: str = 'default_policy.json'
 _SAMPLING_LOCK_PATH: str = 'lock_sampling'
 
 
-class _StubGeneralConfig:
+class _StubGeneralConfig:  # pylint: disable=too-many-instance-attributes
     def __init__(self):
         self.location = None
         self.target_project_id = None
@@ -125,22 +125,42 @@ def test__process_start_ok(monkeypatch):
     config.pubsub_request = 'PUBSUB_REQUEST'
     config.sampling_lock_path = _SAMPLING_LOCK_PATH
     sample_start_req_lst: List[command.CommandSampleStart] = []
+    called_drop = False
+    called_publish = False
+
+    def mocked_drop_all_sample_tables(  # pylint: disable=unused-argument
+        *,
+        project_id: str,
+        location: Optional[str] = None,
+        labels: Optional[Dict[str, str]] = None,
+    ) -> None:
+        nonlocal called_drop
+        assert project_id == config.target_project_id
+        assert location == config.location
+        called_drop = True
 
     def mocked_publish(value: Dict[str, Any], topic_path: str) -> str:
         assert topic_path == config.pubsub_request
         nonlocal sample_start_req_lst
+        nonlocal called_publish
         sample_start_req_lst.append(command.CommandSampleStart.from_dict(value))
+        called_publish = True
 
     _mock_general_config(monkeypatch, config)
     monkeypatch.setattr(process_request.sampler_bucket.gcs, 'read_object', gcs_on_disk.read_object)
     monkeypatch.setattr(
         process_request.sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names
     )
+    monkeypatch.setattr(
+        process_request.sampler_query, 'drop_all_sample_tables', mocked_drop_all_sample_tables
+    )
     monkeypatch.setattr(process_request.sampler_query, 'row_count', lambda _: 100)
     monkeypatch.setattr(process_request.pubsub, 'publish', mocked_publish)
     # When
     process_request._process_start(cmd)
     # Then
+    assert called_drop
+    assert called_publish
     assert len(sample_start_req_lst) == 6
     for start_req in sample_start_req_lst:
         assert start_req.target_table.project_id == config.target_project_id

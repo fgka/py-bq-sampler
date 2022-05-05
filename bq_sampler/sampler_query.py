@@ -255,6 +255,23 @@ def _validate_order(order: str) -> str:
     return result
 
 
+def drop_all_sample_tables(
+    *,
+    project_id: str,
+    location: Optional[str] = None,
+    labels: Optional[Dict[str, str]] = None,
+) -> None:
+    """
+    Just a wrapper for :py:func:`bq.drop_all_tables_by_labels`.
+
+    :param project_id:
+    :param location:
+    :param labels:
+    :return:
+    """
+    bq.drop_all_tables_by_labels(project_id=project_id, location=location, labels=labels)
+
+
 def create_table_with_random_sample(
     *,
     source_table_ref: table.TableReference,
