@@ -201,4 +201,11 @@ gcloud alpha monitoring policies create \
   --policy-from-file="${NOT_EXEC_POLICY_JSON}"
 ```
 
+## Alerting and notifications
+
+The production solution on receiving emails, for instance, is to use [SendGrind Email API](https://cloud.google.com/security-command-center/docs/how-to-enable-real-time-notifications).
+For costs purposes, follow the custom implementation using [sendmail_pubsub](https://medium.com/google-cloud/sending-emails-natively-from-google-cloud-pub-sub-events-f8260ffa6a89).
+
+### [Customized Sendmail PubSub](SENDMAIL_PUBSUB.md)
+
 ## [Integration Tests](INTEG_TESTING.md)

@@ -126,7 +126,6 @@ OPT_PUBSUB_ERROR="pubsub-error"
 OPT_SCHED_JOB="cronjob"
 OPT_POLICY_BUCKET="policy-bucket"
 OPT_REQUEST_BUCKET="request-bucket"
-OPT_MON_CHANNEL="monitoring-channel"
 
 unset ARGUMENT_FLAG_LIST
 set -a ARGUMENT_FLAG_LIST
@@ -150,7 +149,6 @@ ARGUMENT_LIST=(
     "${OPT_SCHED_JOB}"
     "${OPT_POLICY_BUCKET}"
     "${OPT_REQUEST_BUCKET}"
-    "${OPT_MON_CHANNEL}"
 )
 
 # read arguments
@@ -173,7 +171,6 @@ DEFAULT_PUBSUB_ERROR_TOPIC="${FUNCTION_NAME}-error"
 DEFAULT_SCHEDULER_JOB_NAME="cronjob-${FUNCTION_NAME}"
 DEFAULT_POLICY_BUCKET_NAME="sample-policy-1234"
 DEFAULT_REQUEST_BUCKET_NAME="sample-request-9876"
-DEFAULT_MONITORING_CHANNEL_NAME="${FUNCTION_NAME}-error-monitoring"
 
 ###############################################################
 ### GLOBAL DEFINITIONS
@@ -194,7 +191,6 @@ POLICY_BUCKET_NAME="${DEFAULT_POLICY_BUCKET_NAME}"
 REQUEST_BUCKET_NAME="${DEFAULT_REQUEST_BUCKET_NAME}"
 POLICY_OBJECT_PATH="default-policy.json"
 SAMPLING_LOCK_OBJECT_PATH="block-sampling"
-MONITORING_CHANNEL_NAME="${DEFAULT_MONITORING_CHANNEL_NAME}"
 
 LOG_FILE=`mktemp`
 # YES == true
@@ -406,7 +402,6 @@ function help
     echo -e "\t\t[--${OPT_SCHED_JOB} <SCHEDULER_JOB_NAME>]"
     echo -e "\t\t[--${OPT_POLICY_BUCKET} <POLICY_BUCKET_NAME>]"
     echo -e "\t\t[--${OPT_REQUEST_BUCKET} <REQUEST_BUCKET_NAME>]"
-    echo -e "\t\t[--${OPT_MON_CHANNEL} <MONITORING_CHANNEL_NAME>]"
     echo -e "Where:"
     echo -e "\t-h | --${OPT_HELP} this help"
     echo -e "\t--${OPT_VERBOSE} set log level to DEBUG"
@@ -426,8 +421,7 @@ function help
     echo -e "\t\t--${OPT_PUBSUB_ERROR} ${DEFAULT_PUBSUB_ERROR_TOPIC} \\"
     echo -e "\t\t--${OPT_SCHED_JOB} ${DEFAULT_SCHEDULER_JOB_NAME} \\"
     echo -e "\t\t--${OPT_POLICY_BUCKET} ${DEFAULT_POLICY_BUCKET_NAME} \\"
-    echo -e "\t\t--${OPT_REQUEST_BUCKET} ${DEFAULT_REQUEST_BUCKET_NAME} \\"
-    echo -e "\t\t--${OPT_MON_CHANNEL} ${DEFAULT_MONITORING_CHANNEL_NAME}"
+    echo -e "\t\t--${OPT_REQUEST_BUCKET} ${DEFAULT_REQUEST_BUCKET_NAME}"
     echo
 }
 
@@ -503,7 +497,7 @@ function clear_bucket
         exit -1
     fi
     log_info "Cleaning up bucket ${BUCKET}"
-    exec_cmd "gsutil rm -r gs://${BUCKET}/** || echo \"ignore error.\""
+    exec_cmd "gsutil rm -r gs://${BUCKET}/** || echo \"Error. Ignoring.\""
 }
 
 function list_bucket
@@ -708,16 +702,23 @@ function big_query_table_add_column
         exit -1
     fi
     log_info "Adding column ${COL_NAME} to BigQuery table ${TBL_ID}"
+    local CURR_SCHEMA=$(mktemp)
     local NEW_SCHEMA=$(mktemp)
-    _big_query_table_schema "${TBL_ID}" \
-        | jq -c ". + [{
-            \"name\": \"${COL_NAME}\",
-            \"type\": \"STRING\",
-            \"mode\": \"NULLABLE\",
-            \"description\": \"Added column\"
-        }]" \
-        > ${NEW_SCHEMA}
-    _big_query_update_schema "${TBL_ID}" "${NEW_SCHEMA}"
+    _big_query_table_schema "${TBL_ID}" > ${CURR_SCHEMA}
+    if [ -z "$(grep ${COL_NAME} ${CURR_SCHEMA})" ]
+    then
+        cat ${CURR_SCHEMA} \
+            | jq -c ". + [{
+                \"name\": \"${COL_NAME}\",
+                \"type\": \"STRING\",
+                \"mode\": \"NULLABLE\",
+                \"description\": \"Added column\"
+            }]" \
+            > ${NEW_SCHEMA}
+        _big_query_update_schema "${TBL_ID}" "${NEW_SCHEMA}"
+    else
+        log_info "Current schema already contains column ${COL_NAME}. Ignoring."
+    fi
 }
 
 function _big_query_table_schema
@@ -732,7 +733,7 @@ function _big_query_update_schema
     local TBL_ID=${1}
     local SCHEMA_FILE=${2}
 
-    exec_cmd "bq --location ${LOCATION} update ${TBL_ID} ${SCHEMA_FILE}"
+    exec_cmd "bq --location ${LOCATION} update --schema ${SCHEMA_FILE} ${TBL_ID}"
 }
 
 function big_query_table_drop_column
@@ -751,11 +752,27 @@ function big_query_table_drop_column
         exit -1
     fi
     log_info "Dropping column ${COL_NAME} in BigQuery table ${TBL_ID}"
-    local NEW_SCHEMA=$(mktemp)
-    _big_query_table_schema ${TBL_ID} \
-        | jq -c ". + [.[] | select(.name != \"${COL_NAME}\")]" \
-        > ${NEW_SCHEMA}
-    _big_query_update_schema "${TBL_ID}" "${NEW_SCHEMA}"
+    local TBL_DS_ID="${TBL_ID##*:}"
+    _big_query_query_replace ${TBL_ID} "SELECT * EXCEPT(${COL_NAME}) FROM \"${TBL_DS_ID}\""
+}
+
+function _big_query_query_replace
+{
+    local TBL_ID="${1}"
+    shift 1
+    local QUERY="${@}"
+
+    log_info "Executing query ${QUERY} into ${TBL_ID}"
+    local TBL_PRJ_ID="${TBL_ID%%:*}"
+    exec_cmd "bq \
+      --location ${LOCATION} \
+      --project_id ${TBL_PRJ_ID} \
+      query \
+      --destination_table ${TBL_ID} \
+      --replace \
+      --use_legacy_sql=false \
+      \"${QUERY}\""
+    log_dbg "Executed query ${QUERY} into ${TBL_ID}"
 }
 
 ### Function
@@ -938,7 +955,7 @@ function fix_invalid_request_json
     log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_EMPTY_PATH}"
     log_info "Fixing non-json request: ${TARGET}"
-    upload_file "${REQUEST_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
+    upload_file "${REQUEST_BUCKET_NAME}" "${TARGET}" "${REQUEST_FULL_RANDOM}"
     trigger_function
     show_content
     log_info "###############################################################"
@@ -979,10 +996,10 @@ function policy_removal
 function source_schema_change_overwrites_local
 {
     log_info "###############################################################"
-	log_info "# Wait there is a new schema in PROD:"
-	log_info "# - [STORY] In PROD there is a new column for table;"
+	log_info "# Wait there is a schema overwrite in the Sample:"
+	log_info "# - [STORY] In the sample there is a new column in the table;"
 	log_info "# - [DEMO] Add a new column to a sampled table;"
-	log_info "# - [DEMO] Show that the sample table now contains the new column;"
+	log_info "# - [DEMO] Show that the sample table does not contain the new column anymore;"
     log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
     log_info "Adding table policy: ${TARGET}"
@@ -1029,8 +1046,15 @@ function lock_sampling
 	log_info "# - [STORY] As a Scientist I need table data for multiple days;"
 	log_info "# - [DEMO] Put the lock file in place (to interrupt all sampling);"
     log_info "###############################################################"
+    local TARGET="${PROJECT_ID}/${POLICY_FULL_RANDOM_PATH}"
+    log_info "Adding table policy: ${TARGET}"
+    upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
+    trigger_function
+    show_content
     log_info "Locking sample"
     upload_file "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}" "${POLICY_EMPTY}"
+    log_info "Removing policy for table: ${TARGET}"
+    delete_object "${POLICY_BUCKET_NAME}" "${TARGET}"
     trigger_function
     show_content
     delete_object "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}"
@@ -1050,6 +1074,7 @@ function source_schema_change_during_lock
     log_info "###############################################################"
     local TARGET="${PROJECT_ID}/${POLICY_FULL_SORTED_PATH}"
     log_info "Locking sample and changing schema in ${TARGET}"
+    upload_file "${POLICY_BUCKET_NAME}" "${TARGET}" "${POLICY_FULL_RANDOM}"
     upload_file "${REQUEST_BUCKET_NAME}" "${SAMPLING_LOCK_OBJECT_PATH}" "${POLICY_EMPTY}"
     local BQ_TABLE_ID=$(table_id_from_path "${PROJECT_ID}" "${POLICY_FULL_SORTED_PATH}")
     log_info "Adding column to source table schema: ${BQ_TABLE_ID}"
@@ -1091,7 +1116,7 @@ function main
         deploy_function
     fi
     clean_up
-    run tests
+    # run tests
     first_empty_policy
     request_not_compliant
     policy_for_request_compliance
@@ -1178,10 +1203,6 @@ do
 			;;
 		--${OPT_REQUEST_BUCKET})
 			REQUEST_BUCKET_NAME=${2}
-			shift 2
-			;;
-		--${OPT_MON_CHANNEL})
-			MONITORING_CHANNEL_NAME=${2}
 			shift 2
 			;;
         *)
