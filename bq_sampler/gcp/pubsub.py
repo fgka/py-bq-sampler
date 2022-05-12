@@ -26,16 +26,32 @@ def parse_json_data(value: Union[str, bytes]) -> Any:
     :return:
     """
     # parse PubSub payload
+    try:
+        result = json.loads(parse_str_data(value))
+    except Exception as err:
+        raise RuntimeError(
+            f'Could not parse PubSub JSON data. Raw data: <{value}>. Error: {err}'
+        ) from err
+    return result
+
+
+def parse_str_data(value: Union[str, bytes]) -> str:
+    """
+    Parses a Pub/Sub base64 coded :py:class:`str`.
+
+    :param value: the raw payload from Pub/Sub.
+    :return:
+    """
+    # parse PubSub payload
     if not isinstance(value, (bytes, str)):
         raise TypeError(
             f'Event data is not a {str.__name__} or {bytes.__name__}. Got: <{value}>({type(value)})'
         )
     try:
-        decoded_event_data = base64.b64decode(value).decode('utf-8')
-        result = json.loads(decoded_event_data)
+        result = base64.b64decode(value).decode('utf-8')
     except Exception as err:
         raise RuntimeError(
-            f'Could not parse PubSub data. Raw data: <{value}>. Error: {err}'
+            f'Could not parse PubSub string data. Raw data: <{value}>. Error: {err}'
         ) from err
     return result
 

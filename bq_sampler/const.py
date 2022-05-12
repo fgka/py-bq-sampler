@@ -59,3 +59,12 @@ Default GCP resource label to be applied table created here.
 REQUEST_TYPE_START = 'START'
 REQUEST_TYPE_SAMPLE_START = 'SAMPLE_START'
 REQUEST_TYPE_SAMPLE_DONE = 'SAMPLE_DONE'
+
+
+##################
+#  Notification  #
+##################
+
+NOTIFICATION_PUBSUB_CONTENT_MESSAGE_TMPL: str = (
+    'A new high or critical severity finding was detected:\n\n{}'
+)

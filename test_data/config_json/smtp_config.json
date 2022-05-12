@@ -1,0 +1,13 @@
+{
+  "username": "test@example.com",
+  "password_secret_name": "test_password_secret_name",
+  "smtp_server": "smtp.example.com",
+  "smtp_port": 587,
+  "use_tls": true,
+  "subject": "test_subject",
+  "sender": "test@example.com",
+  "recipients": [
+    "me@example.com",
+    "you@example.com"
+  ]
+}
