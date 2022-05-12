@@ -6,7 +6,8 @@ Reads an object from `Cloud Storage`_.
 .. Cloud Storage: https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/read-write-to-cloud-storage
 """
 # pylint: enable=line-too-long
-from typing import Callable, Generator, Optional
+import re
+from typing import Callable, Generator, Optional, Tuple
 
 import cachetools
 
@@ -15,6 +16,8 @@ from google.cloud import storage
 from bq_sampler import logger
 
 _LOGGER = logger.get(__name__)
+
+_GS_URI_REGEX: str = 'gs://(.*?)/(.*)'
 
 
 class CloudStorageDownloadError(Exception):
@@ -25,15 +28,28 @@ class CloudStorageListError(Exception):
     """To code all GCS list errors"""
 
 
-def read_object(bucket_name: str, path: str) -> bytes:
-    """Reads the content of a blob
-    Source: https://googleapis.dev/python/storage/latest/index.html
-    Args:
-        bucket_name (str): Bucket name
-        path (str): Path to the object to read from (**WITHOUT** leading `/`)
+def bucket_path_from_uri(value: str) -> Tuple[str, str]:
+    """
+    Converts a URI string into its bucket and path components.
 
-    Returns:
-        Content of the object
+    :param value: Something like `'gs://bucket/path/to/object'`
+    :return: Something like: `('bucket', 'path/to/object')`
+    """
+    if not isinstance(value, str):
+        raise TypeError(f'Given value is not a string. Got: <{value}>({type(value)})')
+    gs_match = re.match(_GS_URI_REGEX, value)
+    if not isinstance(gs_match, re.Match) or len(gs_match.groups()) != 2:
+        raise ValueError(f'The value must specify a Cloud Storage URI. Got: <{value}>')
+    return gs_match.groups()
+
+
+def read_object(bucket_name: str, path: str) -> bytes:
+    """
+    Reads the content of a blob.
+
+    :param bucket_name: Bucket name
+    :param path: Path to the object to read from (**WITHOUT** leading `/`)
+    :return: Content of the object
     """
     # cleaning leading '/' from path
     path = path.lstrip('/')

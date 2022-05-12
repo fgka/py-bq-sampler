@@ -78,47 +78,63 @@ class HasPatchWith(HasIsEmpty):
             kwargs = self._create_merge_kwargs(value)
         except Exception as err:  # pylint: disable=broad-except[
             raise ValueError(
-                f'Could not create merge kwargs. Current object: <{self}>. '
-                f'Value: <{value}>. '
-                f'Error: {err}'
+                'Could not create merge kwargs.'
+                f' Current object: <{self}> ({self.__class__.__name__}).'
+                f' Value: <{value}>.'
+                f' Error: {err}'
             ) from err
         try:
             result = self.__class__(**kwargs)
         except Exception as err:  # pylint: disable=broad-except
             raise ValueError(
-                f'Could not instantiate <{self.__class__.__name__}> '
-                f'from kwargs <{kwargs}>. '
-                f'Error: {err}'
+                f'Could not instantiate <{self.__class__.__name__}>'
+                f' from kwargs <{kwargs}>.'
+                f' Error: {err}'
             ) from err
         return result
 
     def _create_merge_kwargs(self, value: Any) -> Dict[str, Any]:
         result = {}
         for field in list(attrs.fields(self.__class__)):
-            self_field = getattr(self, field.name)
-            value_field = getattr(value, field.name)
-            result_field = self_field
-            if self_field is None:
-                # clear substitution
-                result_field = value_field
-            elif (
-                self_field is not None
-                and value_field is not None
-                and issubclass(field.type, HasPatchWith)
-            ):
-                # recursion on patch_with()
-                try:
-                    result_field = self_field.patch_with(value_field)
-                except Exception as err:  # pylint: disable=broad-except
-                    value_field = None
-                    _LOGGER.warning(
-                        'Could create field <%s> patching <%s> with <%s>. Ignoring. Error: %s',
-                        field.name,
-                        self_field,
-                        value_field,
-                        err,
-                    )
-            result[field.name] = result_field
+            try:
+                result_field = self._create_field_value(field, value)
+                result[field.name] = result_field
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.warning(
+                    'Could not retrieve field <%s> from <%s> for type <%s>. Ignoring. Error: <%s>',
+                    field.name,
+                    value,
+                    self.__class__.__name__,
+                    err,
+                )
+        return result
+
+    def _create_field_value(self, field: attrs.Attribute, value: Any) -> Any:
+        self_field = getattr(self, field.name)
+        value_field = getattr(value, field.name)
+        result = self_field
+        if self_field is None:
+            # clear substitution
+            result = value_field
+        elif (
+            self_field is not None
+            and value_field is not None
+            and issubclass(field.type, HasPatchWith)
+        ):
+            # recursion on patch_with()
+            try:
+                result = self_field.patch_with(value_field)
+            except Exception as err:  # pylint: disable=broad-except
+                value_field = None
+                _LOGGER.warning(
+                    'Could create field <%s> patching <%s> with <%s> for type <%s>.'
+                    ' Ignoring. Error: %s',
+                    field.name,
+                    self_field,
+                    value_field,
+                    self.__class__.__name__,
+                    err,
+                )
         return result
 
 
@@ -189,14 +205,23 @@ class HasFromDict(HasPatchWith):
         result = {}
         for field in list(attrs.fields(cls)):
             field_value = value.get(field.name)
-            if field_value is not None and issubclass(field.type, HasFromDict):
+            if (
+                field_value is not None
+                and isinstance(
+                    field.type, type
+                )  # things like lists and dicts are of type: typing.List/typing.Dict
+                and issubclass(field.type, HasFromDict)
+            ):
                 # recursion on from_dict()
                 try:
                     field_value = field.type.from_dict(field_value)
                 except Exception as err:  # pylint: disable=broad-except
                     field_value = None
                     _LOGGER.warning(
-                        'Could create field <%s> from dict. Ignoring. Error: %s', field.name, err
+                        'Could create field <%s> from dict for type <%s>. Ignoring. Error: %s',
+                        field.name,
+                        cls.__name__,
+                        err,
                     )
             result[field.name] = field_value
         return result
@@ -220,7 +245,10 @@ class HasFromJsonString(HasFromDict):
             value = json.loads(json_string)
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.warning(
-                'Could not parse JSON string <%s>. Ignoring. Error: %s', json_string, err
+                'Could not parse JSON string <%s> for type <%s>. Ignoring. Error: %s',
+                json_string,
+                cls.__name__,
+                err,
             )
         return cls.from_dict(value)
 
@@ -234,7 +262,10 @@ class HasFromJsonString(HasFromDict):
         try:
             value_dict = attrs.asdict(self)
         except Exception as err:  # pylint: disable=broad-except
-            raise ValueError(f'Could not convert <{self}> to a dictionary. Error: {err}') from err
+            raise ValueError(
+                f'Could not convert <{self}> to a dictionary for type {self.__class__.__name__}.'
+                f' Error: {err}'
+            ) from err
         # now to a JSON string from the dict
         try:
             result = json.dumps(value_dict)

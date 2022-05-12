@@ -1,0 +1,9 @@
+{
+  "api_key_secret_name": "test_api_key_secret_name",
+  "subject": "test_subject",
+  "sender": "test@example.com",
+  "recipients": [
+    "me@example.com",
+    "you@example.com"
+  ]
+}

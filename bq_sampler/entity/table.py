@@ -21,7 +21,10 @@ class SizeSpec(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-pub
     """
 
     count: int = attrs.field(
-        default=None, validator=attrs.validators.optional(validator=attrs.validators.gt(0))
+        default=None,
+        validator=attrs.validators.optional(
+            validator=[attrs.validators.instance_of(int), attrs.validators.gt(0)]
+        ),
     )
     percentage: float = attrs.field(
         default=None,
