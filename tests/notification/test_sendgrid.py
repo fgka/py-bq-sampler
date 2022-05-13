@@ -70,14 +70,30 @@ class _StubbedResponse:
         self.headers = {}
 
 
+class _Object(object):  # pylint: disable=useless-object-inheritance
+    """
+    This is necessary since `obj = object()` will not add the `__dict__` attribute
+        which is necessary to be able to dynamically add attributes to the instance.
+    """
+
+
 class _StubbedClient:
     def __init__(self):
         self.called = False
+        self.client = _Object()
+        # pylint: disable=no-member
+        setattr(self.client, 'mail', _Object())
+        setattr(self.client.mail, 'send', _Object())
+        setattr(self.client.mail.send, 'post', self.post)
+
+    def post(self, request_body: Dict[str, Any]) -> _StubbedResponse:
+        assert isinstance(request_body, dict)
+        self.called = True
+        return _StubbedResponse()
 
     def send(self, message: mail.Mail) -> _StubbedResponse:
         assert isinstance(message, mail.Mail)
-        self.called = True
-        return _StubbedResponse()
+        return self.post(message.get())
 
 
 def _mock_client(monkeypatch) -> _StubbedClient:

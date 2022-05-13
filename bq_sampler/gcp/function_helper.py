@@ -30,9 +30,15 @@ def project_id() -> str:
     try:
         req = urllib.request.Request(_PROJECT_ID_METADATA_URL)
         req.add_header("Metadata-Flavor", "Google")
-        result = urllib.request.urlopen(req).read().decode()
-    except Exception as err:
-        _LOGGER.error('Could not retrieve Project ID from URL: <%s>. Trying with default credentials. Error: %s', _PROJECT_ID_METADATA_URL, err)
+        result = urllib.request.urlopen(req).read().decode()  # pylint: disable=consider-using-with
+    except Exception as err:  # pylint: disable=broad-except
+        _LOGGER.error(
+            'Could not retrieve Project ID from URL: <%s>.'
+            ' Trying with default credentials.'
+            ' Error: %s',
+            _PROJECT_ID_METADATA_URL,
+            err,
+        )
         _, result = gcp_default_credentials()
     return result
 
@@ -45,5 +51,5 @@ def gcp_default_credentials() -> Tuple[google.oauth2.credentials.Credentials, st
     try:
         result = google.auth.default()
     except Exception as err:
-        raise RuntimeError(f'Could not retrieve GCP\'s default credentials. Error: {err}')
+        raise RuntimeError(f'Could not retrieve GCP\'s default credentials. Error: {err}') from err
     return result

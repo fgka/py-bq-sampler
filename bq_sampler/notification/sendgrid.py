@@ -26,12 +26,12 @@ from bq_sampler.gcp import pubsub
 _LOGGER = logger.get(__name__)
 # pylint: enable=duplicate-code
 
-_SENDGRID_CONFIG_URI_ENV_VAR: str = 'SENDGRID_CONFIG_URI'
+SENDGRID_CONFIG_URI_ENV_VAR: str = 'SENDGRID_CONFIG_URI'
 
 
 class _GeneralConfig:  # pylint: disable=too-few-public-methods
     def __init__(self):
-        self.sendgrid_config_uri = os.environ.get(_SENDGRID_CONFIG_URI_ENV_VAR)
+        self.sendgrid_config_uri = os.environ.get(SENDGRID_CONFIG_URI_ENV_VAR)
 
 
 def event_to_msg_fn(event_data: Union[str, bytes]) -> mail.Mail:

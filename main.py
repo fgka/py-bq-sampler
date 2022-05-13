@@ -8,7 +8,6 @@ GCP CloudFunction mandatory entry point:
 """
 # pylint: enable=line-too-long
 import base64
-import json
 import os
 from typing import Any, Callable, Dict, Optional
 
@@ -19,10 +18,10 @@ try:
     client = google.cloud.logging.Client()
     client.get_default_handler()
     client.setup_logging()
-except Exception as err:
-    print(f'Could not start Google Client logging. Ignoring. Error: {err}')
+except Exception as log_err:  # pylint: disable=broad-except
+    print(f'Could not start Google Client logging. Ignoring. Error: {log_err}')
 
-import click
+import click  # pylint: disable=wrong-import-position
 import flask  # pylint: disable=wrong-import-position
 
 from bq_sampler import entry  # pylint: disable=wrong-import-position
@@ -129,23 +128,49 @@ def cli() -> None:
     """
 
 
-@cli.command(
-    help='SMTP email sender'
-)
+@cli.command(help='SMTP email sender')
 @click.option('--config-uri', '-c', required=True, type=str, help='SMTP Cloud Storage config URI')
-@click.option('--json-payload', '-d', default=_DEFAULT_EMAIL_JSON_PAYLOAD, required=False, type=str, help='What to send as an event.')
+@click.option(
+    '--json-payload',
+    '-d',
+    default=_DEFAULT_EMAIL_JSON_PAYLOAD,
+    required=False,
+    type=str,
+    help='What to send as an event.',
+)
 def smtp_sender(config_uri: str, json_payload: str) -> None:
-    os.environ[smtp._SMTP_CONFIG_URI_ENV_VAR] = config_uri
+    """
+    CLI wrapper to :py:func:`handler_smtp`.
+
+    :param config_uri:
+    :param json_payload:
+    :return:
+    """
+    os.environ[smtp.SMTP_CONFIG_URI_ENV_VAR] = config_uri
     handler_smtp(_create_event_str(json_payload))
 
 
-@cli.command(
-    help='SendGrid email sender'
+@cli.command(help='SendGrid email sender')
+@click.option(
+    '--config-uri', '-c', required=True, type=str, help='SendGrid Cloud Storage config URI'
 )
-@click.option('--config-uri', '-c', required=True, type=str, help='SendGrid Cloud Storage config URI')
-@click.option('--json-payload', '-d', default=_DEFAULT_EMAIL_JSON_PAYLOAD, required=False, type=str, help='What to send as an event.')
+@click.option(
+    '--json-payload',
+    '-d',
+    default=_DEFAULT_EMAIL_JSON_PAYLOAD,
+    required=False,
+    type=str,
+    help='What to send as an event.',
+)
 def sendgrid_sender(config_uri: str, json_payload: str) -> None:
-    os.environ[sendgrid._SENDGRID_CONFIG_URI_ENV_VAR] = config_uri
+    """
+    CLI wrapper to :py:func:`handler_sendgrid`.
+
+    :param config_uri:
+    :param json_payload:
+    :return:
+    """
+    os.environ[sendgrid.SENDGRID_CONFIG_URI_ENV_VAR] = config_uri
     handler_sendgrid(_create_event_str(json_payload))
 
 

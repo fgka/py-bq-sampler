@@ -25,12 +25,12 @@ from bq_sampler.gcp import pubsub
 _LOGGER = logger.get(__name__)
 # pylint: enable=duplicate-code
 
-_SMTP_CONFIG_URI_ENV_VAR: str = 'SMTP_CONFIG_URI'
+SMTP_CONFIG_URI_ENV_VAR: str = 'SMTP_CONFIG_URI'
 
 
 class _GeneralConfig:  # pylint: disable=too-few-public-methods
     def __init__(self):
-        self.smtp_config_uri = os.environ.get(_SMTP_CONFIG_URI_ENV_VAR)
+        self.smtp_config_uri = os.environ.get(SMTP_CONFIG_URI_ENV_VAR)
 
 
 def event_to_msg_fn(event: Union[str, bytes]) -> message.EmailMessage:
