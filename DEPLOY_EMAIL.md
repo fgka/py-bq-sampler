@@ -51,7 +51,7 @@ gsutil iam ch \
 Below we assume Gmail as the SMTP provider, please check your SMTP server client setup for the appropriate values.
 
 **NOTE**: If you are using Gmail and 2FA, you will need to set up an application password in the URL:
-[https://security.google.com/settings/security/apppasswords]
+https://security.google.com/settings/security/apppasswords
 
 ### Save Password Secret
 
@@ -131,6 +131,8 @@ gcloud functions deploy "${EMAIL_FUNCTION_NAME}" \
 ### SendGrid
 
 Using SendGrid to send emails. Remember to set the proper API key.
+
+Don't forget to authenticate your sender first in https://docs.sendgrid.com/ui/sending-email/sender-verification.
 
 ### Save Password Secret
 
