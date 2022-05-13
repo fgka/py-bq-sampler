@@ -40,3 +40,8 @@ python3 ./setup.py install
 
 ## [CLI usage](CLI_USAGE.md)
 
+## Design
+
+![img](doc/DataScienceEnvDesign.drawio.png)
+
+[Source](doc/DataScienceEnvDesign.drawio) ([draw.io](https://draw.io))

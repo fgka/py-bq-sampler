@@ -66,6 +66,7 @@ SETUP_REQUIRED = [
 
 # What packages are required for this module's docs to be built
 DOCS_REQUIRED = [
+    'diagrams>=0.21.1',
     'Sphinx>=2.0.1',
 ]
 
