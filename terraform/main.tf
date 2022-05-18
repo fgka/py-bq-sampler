@@ -173,7 +173,7 @@ module "notification" {
   }
   trigger_config = {
     event    = "google.pubsub.topic.publish"
-    resource = module.pubsub_cmd.id
+    resource = module.pubsub_err.id
     retry    = null
   }
   depends_on = [google_project_service.services]

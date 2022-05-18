@@ -54,7 +54,9 @@ popd
 
 ```bash
 OUT_JSON=`mktemp`
+pushd terraform
 terraform output -json > ${OUT_JSON}
+popd
 echo "Terraform output in ${OUT_JSON}"
 
 export PROJECT_ID=$(jq -c -r '.project_id.value' ${OUT_JSON})
@@ -79,7 +81,7 @@ DEFAULT_POLICY_FILE="<local JSON containing the default policy>"
 Upload:
 
 ```bash
-gs util cp ${DEFAULT_POLICY_FILE} ${DEFAULT_POLICY_URI}
+gsutil cp ${DEFAULT_POLICY_FILE} ${DEFAULT_POLICY_URI}
 ```
 
 ### Secret
@@ -160,6 +162,7 @@ gsutil cp ${CFG_FILE} ${NOTIFICATION_CONFIG_URI}
 
 ```bash
 gcloud pubsub topics publish ${PUBSUB_ERROR_TOPIC} \
+  --project="${PROJECT_ID}" \
   --message="{\"key\":\"value\"}"
 ```
 
