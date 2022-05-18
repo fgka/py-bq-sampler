@@ -1,0 +1,4 @@
+init.tf
+**/.terraform*
+**/dist
+**/terraform.tfstate*

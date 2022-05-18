@@ -23,6 +23,7 @@ You will need:
 - [Google Cloud SDK](https://cloud.google.com/sdk) (tested with `v384.0.0`)
 - [gsutil](https://cloud.google.com/storage/docs/gsutil) (tested with `v5.6`)
 - [jq](https://stedolan.github.io/jq/) (tested with `v1.6`)
+- [terraform](https://www.terraform.io/) (tested with `v1.1.9`)
 
 ## [Development](DEVELOPMENT.md)
 

@@ -7,9 +7,9 @@ Requires environment variables defined in [infrastructure](INFRASTRUCTURE.md).
 ```bash
 export EMAIL_FUNCTION_NAME="${FUNCTION_NAME}-notification"
 export EMAIL_FUNCTION_SA="${EMAIL_FUNCTION_NAME}-sa"
-export EMAIL_FUNCTION_SMTP_SECRET="${EMAIL_FUNCTION_NAME}-smtp-password"
+export EMAIL_FUNCTION_SMTP_SECRET="${EMAIL_FUNCTION_NAME}-smtp-secret"
 export EMAIL_FUNCTION_SMTP_CONFIG_GCS_URI="gs://${POLICY_BUCKET_NAME}/smtp_config.json"
-export EMAIL_FUNCTION_SENDGRID_SECRET="${EMAIL_FUNCTION_NAME}-sendgrid-api-key"
+export EMAIL_FUNCTION_SENDGRID_SECRET="${EMAIL_FUNCTION_NAME}-sendgrid-secret"
 export EMAIL_FUNCTION_SENDGRID_CONFIG_GCS_URI="gs://${POLICY_BUCKET_NAME}/sendgrid_config.json"
 export EMAIL_SUBJECT_LINE="[ALERT] There was an issue executing ${FUNCTION_NAME}"
 export EMAIL_MONITORING_CHANNEL_NAME="${EMAIL_FUNCTION_NAME}-error-monitoring"
@@ -156,7 +156,7 @@ echo -e "Set secret content in: \n\thttps://console.cloud.google.com/security/se
 
 For the file definition, see [config.py](./bq_sampler/entity/config.py):
 
-Create config file (remember to change to your SMTP and authentication values):
+Create config file:
 
 ```bash
 SENDGRID_CFG_FILE=`mktemp`
