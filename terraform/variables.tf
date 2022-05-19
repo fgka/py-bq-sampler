@@ -50,8 +50,8 @@ variable "function_bundle_exclude_list_files" {
   type        = list(string)
   description = "All files to provide exclude patterns in the function deployment"
   default = [
-    "../.gcloudignore",
-    "../.gitignore",
+    "../code/.gcloudignore",
+    "../code/.gitignore",
     "function_bundle_extra_exclude.txt"
   ]
 }

@@ -1,12 +1,27 @@
 locals {
+  // Global
   project_id        = try(var.project_id)
   target_project_id = try(var.target_project_id)
   region            = try(var.region)
+  // Cloud Functions
+  function_source_exclude = flatten([
+    for in_file in var.function_bundle_exclude_list_files : split("\n", file(in_file))
+  ])
+  notification_function_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}"
+  notification_handler       = "${var.notification_function_handler_prefix}${lower(var.notification_function_type)}"
+  // something like SMTP_CONFIG_URI="gs://my_policy_bucket/smtp_config.json"
+  notification_config_uri = "gs://${module.policy_bucket.name}/${lower(var.notification_function_type)}${var.notification_config_json_suffix}"
+  notification_env_vars = {
+    LOG_LEVEL                                             = var.notification_function_log_level
+    "${upper(var.notification_function_type)}_CONFIG_URI" = local.notification_config_uri
+  }
+  notification_secret_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}-secret"
 }
 
 data "google_project" "project" {
   project_id = local.project_id
 }
+
 data "google_project" "target_project" {
   project_id = local.target_project_id
 }
@@ -14,6 +29,8 @@ data "google_project" "target_project" {
 ////////////////////
 // Source Project //
 ////////////////////
+
+// Minimum APIs required //
 
 resource "google_project_service" "services" {
   for_each                   = toset(var.services)
@@ -27,17 +44,7 @@ resource "google_project_service" "services" {
   }
 }
 
-resource "google_project_service" "target_services" {
-  for_each                   = toset(var.target_services)
-  project                    = local.target_project_id
-  service                    = each.key
-  disable_dependent_services = true
-  disable_on_destroy         = true
-  timeouts {
-    create = "30m"
-    update = "40m"
-  }
-}
+// Service Accounts //
 
 module "function_service_account" {
   source       = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/iam-service-account"
@@ -68,6 +75,8 @@ module "notification_function_service_account" {
   depends_on = [google_project_service.services]
 }
 
+// GCS //
+
 module "policy_bucket" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/gcs"
   project_id = local.project_id
@@ -81,6 +90,8 @@ module "policy_bucket" {
   }
   depends_on = [google_project_service.services]
 }
+
+// PubSub //
 
 module "pubsub_cmd" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/pubsub"
@@ -96,11 +107,7 @@ module "pubsub_err" {
   depends_on = [google_project_service.services]
 }
 
-locals {
-  function_source_exclude = flatten([
-    for in_file in var.function_bundle_exclude_list_files : split("\n", file(in_file))
-  ])
-}
+// Cloud Functions //
 
 module "sampler" {
   source          = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/cloud-function"
@@ -127,7 +134,7 @@ module "sampler" {
   }
   bucket_name = module.policy_bucket.name
   bundle_config = {
-    source_dir  = "../"
+    source_dir  = "../code"
     output_path = "dist/${var.function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
@@ -137,18 +144,6 @@ module "sampler" {
     retry    = null
   }
   depends_on = [google_project_service.services]
-}
-
-locals {
-  notification_function_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}"
-  notification_handler       = "${var.notification_function_handler_prefix}${lower(var.notification_function_type)}"
-  // something like SMTP_CONFIG_URI="gs://my_policy_bucket/smtp_config.json"
-  notification_config_uri    = "gs://${module.policy_bucket.name}/${lower(var.notification_function_type)}${var.notification_config_json_suffix}"
-  notification_env_vars = {
-    LOG_LEVEL = var.notification_function_log_level
-    "${upper(var.notification_function_type)}_CONFIG_URI" = local.notification_config_uri
-  }
-  notification_secret_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}-secret"
 }
 
 module "notification" {
@@ -167,7 +162,7 @@ module "notification" {
   environment_variables = local.notification_env_vars
   bucket_name           = module.policy_bucket.name
   bundle_config = {
-    source_dir  = "../"
+    source_dir  = "../code"
     output_path = "dist/${local.notification_function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
@@ -178,6 +173,8 @@ module "notification" {
   }
   depends_on = [google_project_service.services]
 }
+
+// Scheduler //
 
 resource "google_cloud_scheduler_job" "trigger_job" {
   name        = var.scheduler_name
@@ -190,6 +187,8 @@ resource "google_cloud_scheduler_job" "trigger_job" {
   }
   depends_on = [google_project_service.services]
 }
+
+// Monitoring and Alerting //
 
 resource "google_monitoring_notification_channel" "error_monitoring_channel" {
   display_name = var.monitoring_channel_name
@@ -286,6 +285,8 @@ resource "google_monitoring_alert_policy" "notification_alert_error_log_policy" 
   depends_on            = [google_project_service.services]
 }
 
+// Secret Manager //
+
 module "notification-secret" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/secret-manager"
   project_id = local.project_id
@@ -303,6 +304,22 @@ module "notification-secret" {
 ////////////////////
 // Target Project //
 ////////////////////
+
+// Minimum APIs required //
+
+resource "google_project_service" "target_services" {
+  for_each                   = toset(var.target_services)
+  project                    = local.target_project_id
+  service                    = each.key
+  disable_dependent_services = true
+  disable_on_destroy         = true
+  timeouts {
+    create = "30m"
+    update = "40m"
+  }
+}
+
+// X-Project Permissions //
 
 resource "google_project_iam_binding" "target_project_iam_bq_data" {
   project    = local.target_project_id
@@ -325,6 +342,8 @@ resource "google_project_iam_binding" "target_project_iam_gcs_obj_viewer" {
   depends_on = [google_project_service.target_services]
 }
 
+// GCS //
+
 module "request_bucket" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/gcs"
   project_id = local.target_project_id
@@ -334,52 +353,4 @@ module "request_bucket" {
     "roles/storage.legacyBucketReader" = ["serviceAccount:${module.function_service_account.email}"]
   }
   depends_on = [google_project_service.target_services]
-}
-
-/////////////
-// Outputs //
-/////////////
-
-output "region" {
-  value = var.region
-}
-
-output "project_id" {
-  value = local.project_id
-}
-
-output "target_project_id" {
-  value = local.target_project_id
-}
-
-output "default_policy_uri" {
-  value = "gs://${module.policy_bucket.name}/${var.default_policy_object_path}"
-}
-
-output "function_name" {
-  value = module.sampler.function_name
-}
-
-output "notification_type" {
-  value = var.notification_function_type
-}
-
-output "notification_function_name" {
-  value = module.notification.function_name
-}
-
-output "notification_secret" {
-  value = local.notification_secret_name
-}
-
-output "notification_config_uri" {
-  value = local.notification_config_uri
-}
-
-output "pubsub_error_topic" {
-  value = module.pubsub_err.topic.name
-}
-
-output "scheduler_job" {
-  value = google_cloud_scheduler_job.trigger_job.name
 }
