@@ -36,8 +36,8 @@ resource "google_project_service" "services" {
   for_each                   = toset(var.services)
   project                    = local.project_id
   service                    = each.key
-  disable_dependent_services = true
-  disable_on_destroy         = true
+  disable_dependent_services = false
+  disable_on_destroy         = false
   timeouts {
     create = "30m"
     update = "40m"
@@ -311,8 +311,8 @@ resource "google_project_service" "target_services" {
   for_each                   = toset(var.target_services)
   project                    = local.target_project_id
   service                    = each.key
-  disable_dependent_services = true
-  disable_on_destroy         = true
+  disable_dependent_services = false
+  disable_on_destroy         = false
   timeouts {
     create = "30m"
     update = "40m"
