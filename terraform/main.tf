@@ -36,6 +36,7 @@ resource "google_project_service" "services" {
   for_each                   = toset(var.services)
   project                    = local.project_id
   service                    = each.key
+  // Be aware of using as 'false' on development mode, since destroying will not disable the APIs
   disable_dependent_services = false
   disable_on_destroy         = false
   timeouts {
@@ -311,6 +312,7 @@ resource "google_project_service" "target_services" {
   for_each                   = toset(var.target_services)
   project                    = local.target_project_id
   service                    = each.key
+  // Be aware of using as 'false' on development mode, since destroying will not disable the APIs
   disable_dependent_services = false
   disable_on_destroy         = false
   timeouts {
