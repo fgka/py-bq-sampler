@@ -12,6 +12,25 @@ We use 2 publicly available datasets, namely:
 These cannot be used directly because the integration tests need some extra permissions that are not broadly given.
 Therefore, we need a local copy.
 
+### Create tables to be cloned
+
+The clone datasets must be created ahead of the transfer and in the target location too. 
+
+```bash
+unset DATASET_ID_LST
+set -a DATASET_ID_LST
+DATASET_ID_LST+=("census_bureau_acs")
+DATASET_ID_LST+=("new_york_taxi_trips")
+for DS_ID in ${DATASET_ID_LST[@]}
+do
+    bq mk \
+      --dataset \
+      --project_id=${PROJECT_ID} \
+      --data_location=${REGION} \
+      ${DS_ID}
+done
+```
+
 ### Clone data sets locally
 
 For more details refer to the
@@ -42,11 +61,15 @@ do
 done
 ```
 
+**NOTE**: This can take some time to finish (the shell is released ahead of finishing the actual transfer).
+Typical times vary between 15 and 30 minutes to finish. 
+
 ## Run manual integration tests
 
 ```bash
 rm -f integ_test.log
 ./bin/manual_integ_tests.sh \
+  --no-deploy \
   --log integ_test.log \
   --prj-id ${PROJECT_ID} \
   --tgt-prj-id ${TARGET_PROJECT_ID} \
