@@ -41,4 +41,4 @@ python3 ./setup.py install
 
 ## [CLI usage](CLI_USAGE.md)
 
-## Design
+## [Design](DESIGN.md)

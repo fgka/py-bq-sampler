@@ -1,5 +1,17 @@
 # Creating and deploying infrastructure
 
+## Authenticate
+
+```bash
+gcloud auth application-default login
+```
+
+### Set default project
+
+```bash
+gcloud init
+```
+
 ## Definitions
 
 Special variable, the target project ID:
@@ -24,6 +36,37 @@ export REQUEST_BUCKET_NAME="sample-request-${TARGET_PROJECT_NUMBER}"
 export DEFAULT_POLICY_OBJECT_PATH="default-policy.json"
 export DEFAULT_SAMPLING_LOCK_OBJECT_PATH="block-sampling"
 export MONITORING_CHANNEL_NAME="${FUNCTION_NAME}-error-monitoring"
+```
+
+## Enable APIs
+
+Main project:
+
+```bash
+gcloud services enable \
+  bigquery.googleapis.com \
+  bigquerydatatransfer.googleapis.com \
+  cloudbuild.googleapis.com \
+  cloudfunctions.googleapis.com \
+  cloudscheduler.googleapis.com \
+  iam.googleapis.com \
+  logging.googleapis.com \
+  monitoring.googleapis.com \
+  pubsub.googleapis.com \
+  secretmanager.googleapis.com \
+  storage.googleapis.com \
+  --project="${PROJECT_ID}"
+```
+
+Target project:
+
+```bash
+gcloud services enable \
+  bigquery.googleapis.com \
+  iam.googleapis.com \
+  logging.googleapis.com \
+  storage.googleapis.com \
+  --project="${TARGET_PROJECT_ID}"
 ```
 
 ## Service Account

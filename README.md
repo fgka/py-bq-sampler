@@ -1,44 +1,20 @@
 # Python code for BigQuery PROD Sampler
 
-## Requirements
+## [Code](./code)
 
-It requires [Python](https://www.python.org/) 3.9 or up.
+Inside `code` you have also the instructions on how to manually deploy the infrastructure
+ and manually test it end-to-end.
+Main documents:
 
-### macOS:
+* [Infrastructure](INFRASTRUCTURE.md)
+* [Deploy](DEPLOY.md)
+* [Integration Tests](INTEG_TESTING.md)
 
-* [Homebrew](https://brew.sh/);
+## [Design](./code/DESIGN.md)
 
-```bash
-brew install python3
-```
+To understand the code and how it works, check out the [design documentation](./code/DESIGN.md).
 
-## Dependencies
+## [Terraform](./terraform)
 
-You will need:
-
-- [Bash](https://www.gnu.org/software/bash/) (tested with `v3.2.57`)
-- [bq](https://cloud.google.com/bigquery/docs/bq-command-line-tool) (tested with `v2.0.74`)
-- [gnu-sed](https://www.gnu.org/software/sed/) (tested with `v4.8`) (on macOS the native one does not work)
-- [gnu-getopt](https://www.gnu.org/software/libc/manual/html_node/Getopt.html) (tested with `v2.38`) (on macOS the native one does not work)
-- [Google Cloud SDK](https://cloud.google.com/sdk) (tested with `v384.0.0`)
-- [gsutil](https://cloud.google.com/storage/docs/gsutil) (tested with `v5.6`)
-- [jq](https://stedolan.github.io/jq/) (tested with `v1.6`)
-- [terraform](https://www.terraform.io/) (tested with `v1.1.9`)
-
-## [Development](DEVELOPMENT.md)
-
-## [Infrastructure](INFRASTRUCTURE.md)
-
-### [Deploy](DEPLOY.md)
-
-### [Integration Tests](INTEG_TESTING.md)
-
-## Install
-
-```bash
-python3 ./setup.py install
-```
-
-## [CLI usage](CLI_USAGE.md)
-
-## Design
+Here you will have the Terraform code to automatically deploy your infrastructure.
+Just follow the instructions in the [README.md](./terraform/README.md) file.
