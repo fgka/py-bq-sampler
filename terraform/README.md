@@ -1,5 +1,17 @@
 # Using Terraform to deploy all
 
+## Authenticate
+
+```bash
+gcloud auth application-default login
+```
+
+### Set default project
+
+```bash
+gcloud init
+```
+
 ## Definitions
 
 Manually set:
@@ -16,36 +28,67 @@ export PROJECT_ID=$(gcloud config get-value core/project)
 export REGION="europe-west3"
 ```
 
+Check:
+
+```bash
+echo "Main project: ${PROJECT_ID}@${REGION}"
+echo "Target project: ${TARGET_PROJECT_ID}@${REGION}"
+echo "Error notification email: ${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
+```
+
+## Enable APIs
+
+Main project:
+
+```bash
+gcloud services enable \
+  bigquery.googleapis.com \
+  bigquerydatatransfer.googleapis.com \
+  cloudbuild.googleapis.com \
+  cloudfunctions.googleapis.com \
+  cloudscheduler.googleapis.com \
+  iam.googleapis.com \
+  logging.googleapis.com \
+  monitoring.googleapis.com \
+  pubsub.googleapis.com \
+  secretmanager.googleapis.com \
+  storage.googleapis.com \
+  --project="${PROJECT_ID}"
+```
+
+Target project:
+
+```bash
+gcloud services enable \
+  bigquery.googleapis.com \
+  iam.googleapis.com \
+  logging.googleapis.com \
+  storage.googleapis.com \
+  --project="${TARGET_PROJECT_ID}"
+```
+
 ## Init
 
 ```bash
-pushd terraform
 terraform init
-popd
 ```
 
 ## Plan
 
 ```bash
-pushd terraform
+TMP=$(mktemp)
 terraform plan \
+  -out ${TMP} \
   -var "project_id=${PROJECT_ID}" \
   -var "target_project_id=${TARGET_PROJECT_ID}" \
   -var "region=${REGION}" \
   -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
-popd
 ```
 
 ## Apply
 
 ```bash
-pushd terraform
-terraform apply \
-  -var "project_id=${PROJECT_ID}" \
-  -var "target_project_id=${TARGET_PROJECT_ID}" \
-  -var "region=${REGION}" \
-  -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
-popd
+terraform apply ${TMP} && rm -f ${TMP}
 ```
 
 ## Add missing bits
@@ -53,23 +96,32 @@ popd
 ### Variables
 
 ```bash
-OUT_JSON=`mktemp`
-pushd terraform
+OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
-popd
 echo "Terraform output in ${OUT_JSON}"
 
-export PROJECT_ID=$(jq -c -r '.project_id.value' ${OUT_JSON})
-export TARGET_PROJECT_ID=$(jq -c -r '.target_project_id.value' ${OUT_JSON})
-export LOCATION=$(jq -c -r '.region.value' ${OUT_JSON})
-export FUNCTION_NAME=$(jq -c -r '.function_name.value' ${OUT_JSON})
-export DEFAULT_POLICY_URI=$(jq -c -r '.default_policy_uri.value' ${OUT_JSON})
-export NOTIFICATION_TYPE=$(jq -c -r '.notification_type.value' ${OUT_JSON})
-export NOTIFICATION_FUNCTION_NAME=$(jq -c -r '.notification_function_name.value' ${OUT_JSON})
-export NOTIFICATION_SECRET=$(jq -c -r '.notification_secret.value' ${OUT_JSON})
-export NOTIFICATION_CONFIG_URI=$(jq -c -r '.notification_config_uri.value' ${OUT_JSON})
-export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_error_topic.value' ${OUT_JSON})
-export SCHEDULER_JOB_NAME=$(jq -c -r '.scheduler_job.value' ${OUT_JSON})
+export PROJECT_ID=$(jq -c -r '.sampler_function.value.project' ${OUT_JSON})
+export TARGET_PROJECT_ID=$(jq -c -r '.request_bucket.value.project' ${OUT_JSON})
+export LOCATION=$(jq -c -r '.sampler_function.value.region' ${OUT_JSON})
+export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
+POLICY_BUCKET=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
+DEFAULT_POLICY_OBJECT=$(jq -c -r '.sampler_function.value.environment_variables.DEFAULT_POLICY_OBJECT_PATH' ${OUT_JSON})
+export DEFAULT_POLICY_URI="gs://${POLICY_BUCKET}/${DEFAULT_POLICY_OBJECT}"
+SMTP_CONFIG_URI=$(jq -c -r '.notification_function.value.environment_variables | if has("SMTP_CONFIG_URI") then .SMTP_CONFIG_URI else "" end' ${OUT_JSON})
+SEMDGRID_CONFIG_URI=$(jq -c -r '.notification_function.value.environment_variables | if has("SEMDGRID_CONFIG_URI") then .SEMDGRID_CONFIG_URI else "" end' ${OUT_JSON})
+if [ -n "${SMTP_CONFIG_URI}" ]
+then
+  export NOTIFICATION_TYPE=SMTP
+  export NOTIFICATION_CONFIG_URI=${SMTP_CONFIG_URI}
+elif [ -n "${SEMDGRID_CONFIG_URI}"]
+then
+  export NOTIFICATION_TYPE=SENDGRID
+  export NOTIFICATION_CONFIG_URI=${SEMDGRID_CONFIG_URI}
+fi
+export NOTIFICATION_FUNCTION_NAME=$(jq -c -r '.notification_function.value.name' ${OUT_JSON})
+export NOTIFICATION_SECRET=$(jq -c -r '.notification_secret.value | keys[0]' ${OUT_JSON})
+export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
+export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
 ```
 
 ### Default policy
@@ -92,7 +144,7 @@ echo -e "Set secret content in: \n\thttps://console.cloud.google.com/security/se
 
 ### Notification config
 
-Similar to [DEPLOY_EMAIL](../DEPLOY_EMAIL.md)
+Similar to [DEPLOY_EMAIL](../code/DEPLOY_EMAIL.md)
 
 Select the config file according to the type of notification:
 
@@ -111,7 +163,7 @@ export EMAIL_SUBJECT_LINE="[ALERT] There was an issue executing ${FUNCTION_NAME}
 Create config file (remember to change to your SMTP and authentication values):
 
 ```bash
-CFG_FILE=`mktemp`
+CFG_FILE=$(mktemp)
 cat > ${CFG_FILE} << __END__
 {
   "username": "me@example.com",
@@ -135,7 +187,7 @@ echo "Config file in ${CFG_FILE}"
 Create config file:
 
 ```bash
-CFG_FILE=`mktemp`
+CFG_FILE=$(mktemp)
 cat > ${CFG_FILE} << __END__
 {
   "api_key_secret_name": "${NOTIFICATION_SECRET}",

@@ -1,43 +1,68 @@
-output "region" {
-  value = var.region
+output "sampler_function" {
+  value = module.sampler.function
 }
 
-output "project_id" {
-  value = local.project_id
+output "sampler_function_service_account" {
+  value = module.sampler_service_account.service_account
 }
 
-output "target_project_id" {
-  value = local.target_project_id
+output "policy_bucket" {
+  value = module.policy_bucket.bucket
 }
 
-output "default_policy_uri" {
-  value = "gs://${module.policy_bucket.name}/${var.default_policy_object_path}"
+output "request_bucket" {
+  value = module.request_bucket.bucket
 }
 
-output "function_name" {
-  value = module.sampler.function_name
+output "pubsub_cmd" {
+  value = module.pubsub_cmd.topic
 }
 
-output "notification_type" {
-  value = var.notification_function_type
+output "pubsub_err" {
+  value = module.pubsub_err.topic
 }
 
-output "notification_function_name" {
-  value = module.notification.function_name
+output "notification_function" {
+  value = module.notification.function
+}
+
+output "notification_function_service_account" {
+  value = module.notification_function_service_account.service_account
+}
+
+output "trigger_job" {
+  value = google_cloud_scheduler_job.trigger_job
+}
+
+output "error_monitoring_channel" {
+  value = google_monitoring_notification_channel.error_monitoring_channel
+}
+
+output "notification_error_monitoring_channel" {
+  value = google_monitoring_notification_channel.notification_error_monitoring_channel
+}
+
+output "alert_error_log_policy" {
+  value = google_monitoring_alert_policy.alert_error_log_policy
+}
+
+output "alert_not_executed_policy" {
+  value = google_monitoring_alert_policy.alert_not_executed_policy
+}
+
+output "notification_alert_error_log_policy" {
+  value = google_monitoring_alert_policy.notification_alert_error_log_policy
 }
 
 output "notification_secret" {
-  value = local.notification_secret_name
+  value     = module.notification_secret.secrets
+  sensitive = true
 }
 
-output "notification_config_uri" {
-  value = local.notification_config_uri
+output "integ_test_datasets" {
+  value = google_bigquery_dataset.integ_test_datasets
 }
 
-output "pubsub_error_topic" {
-  value = module.pubsub_err.topic.name
-}
-
-output "scheduler_job" {
-  value = google_cloud_scheduler_job.trigger_job.name
+output "integ_test_data_transfer" {
+  value = google_bigquery_data_transfer_config.integ_test_data_transfer
 }

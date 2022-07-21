@@ -1,8 +1,4 @@
 locals {
-  // Global
-  project_id        = try(var.project_id)
-  target_project_id = try(var.target_project_id)
-  region            = try(var.region)
   // Cloud Functions
   function_source_exclude = flatten([
     for in_file in var.function_bundle_exclude_list_files : split("\n", file(in_file))
@@ -19,124 +15,104 @@ locals {
 }
 
 data "google_project" "project" {
-  project_id = local.project_id
+  project_id = var.project_id
 }
 
 data "google_project" "target_project" {
-  project_id = local.target_project_id
+  project_id = var.target_project_id
 }
 
 ////////////////////
 // Source Project //
 ////////////////////
 
-// Minimum APIs required //
-
-resource "google_project_service" "services" {
-  for_each                   = toset(var.services)
-  project                    = local.project_id
-  service                    = each.key
-  // Be aware of using as 'false' on development mode, since destroying will not disable the APIs
-  disable_dependent_services = false
-  disable_on_destroy         = false
-  timeouts {
-    create = "30m"
-    update = "40m"
-  }
-}
-
 // Service Accounts //
 
-module "function_service_account" {
+module "sampler_service_account" {
   source       = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/iam-service-account"
-  project_id   = local.project_id
-  name         = var.function_service_account_name
+  project_id   = var.project_id
+  name         = var.sampler_service_account_name
   generate_key = false
   iam_project_roles = {
-    "${local.project_id}" = [
+    "${var.project_id}" = [
       "roles/pubsub.publisher",
       "roles/bigquery.dataViewer",
       "roles/storage.objectViewer",
     ]
   }
-  depends_on = [google_project_service.services]
 }
 
 module "notification_function_service_account" {
   source       = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/iam-service-account"
-  project_id   = local.project_id
+  project_id   = var.project_id
   name         = var.notification_function_service_account_name
   generate_key = false
   iam_project_roles = {
-    "${local.project_id}" = [
+    "${var.project_id}" = [
       "roles/secretmanager.secretAccessor",
       "roles/storage.objectViewer",
     ]
   }
-  depends_on = [google_project_service.services]
 }
 
 // GCS //
 
 module "policy_bucket" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/gcs"
-  project_id = local.project_id
+  project_id = var.project_id
   prefix     = var.policy_bucket_name_prefix
   name       = data.google_project.project.number
   iam = {
     "roles/storage.legacyBucketReader" = [
-      "serviceAccount:${module.function_service_account.email}",
+      "serviceAccount:${module.sampler_service_account.email}",
       "serviceAccount:${module.notification_function_service_account.email}",
     ]
   }
-  depends_on = [google_project_service.services]
 }
 
 // PubSub //
 
 module "pubsub_cmd" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/pubsub"
-  project_id = local.project_id
+  project_id = var.project_id
   name       = var.pubsub_cmd_topic_name
-  depends_on = [google_project_service.services]
 }
 
 module "pubsub_err" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/pubsub"
-  project_id = local.project_id
+  project_id = var.project_id
   name       = var.pubsub_error_topic_name
-  depends_on = [google_project_service.services]
 }
 
 // Cloud Functions //
 
 module "sampler" {
   source          = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/cloud-function"
-  project_id      = local.project_id
-  region          = local.region
-  name            = var.function_name
-  service_account = module.function_service_account.email
+  project_id      = var.project_id
+  region          = var.region
+  name            = var.sampler_function_name
+  service_account = module.sampler_service_account.email
   function_config = {
-    entry_point = var.function_handler
+    entry_point = var.sampler_function_handler
     runtime     = var.function_runtime
     instances   = 1
     memory      = 256
     timeout     = 180
   }
   environment_variables = {
-    BQ_LOCATION                = local.region
-    TARGET_PROJECT_ID          = local.target_project_id
+    BQ_LOCATION                = var.region
+    TARGET_PROJECT_ID          = var.target_project_id
     POLICY_BUCKET_NAME         = module.policy_bucket.name
     DEFAULT_POLICY_OBJECT_PATH = var.default_policy_object_path
     SAMPLING_LOCK_OBJECT_PATH  = var.sampling_lock_object_path
     CMD_TOPIC_NAME             = module.pubsub_cmd.id
     ERROR_TOPIC_NAME           = module.pubsub_err.id
-    LOG_LEVEL                  = var.function_log_level
+    LOG_LEVEL                  = var.sampler_function_log_level
   }
   bucket_name = module.policy_bucket.name
   bundle_config = {
     source_dir  = "../code"
-    output_path = "dist/${var.function_name}-bundle.zip"
+    output_path = "dist/${var.sampler_function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
   trigger_config = {
@@ -144,13 +120,12 @@ module "sampler" {
     resource = module.pubsub_cmd.id
     retry    = null
   }
-  depends_on = [google_project_service.services]
 }
 
 module "notification" {
   source          = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/cloud-function"
-  project_id      = local.project_id
-  region          = local.region
+  project_id      = var.project_id
+  region          = var.region
   name            = local.notification_function_name
   service_account = module.notification_function_service_account.email
   function_config = {
@@ -172,7 +147,6 @@ module "notification" {
     resource = module.pubsub_err.id
     retry    = null
   }
-  depends_on = [google_project_service.services]
 }
 
 // Scheduler //
@@ -186,7 +160,6 @@ resource "google_cloud_scheduler_job" "trigger_job" {
     topic_name = module.pubsub_cmd.id
     data       = base64encode(var.scheduler_data)
   }
-  depends_on = [google_project_service.services]
 }
 
 // Monitoring and Alerting //
@@ -197,7 +170,6 @@ resource "google_monitoring_notification_channel" "error_monitoring_channel" {
   labels = {
     topic = module.pubsub_err.id
   }
-  depends_on = [google_project_service.services]
 }
 
 resource "google_monitoring_notification_channel" "notification_error_monitoring_channel" {
@@ -206,7 +178,6 @@ resource "google_monitoring_notification_channel" "notification_error_monitoring
   labels = {
     email_address = var.notification_monitoring_email_address
   }
-  depends_on = [google_project_service.services]
 }
 
 // based on gcp_resources/alert-function-error-policy.json.tmpl
@@ -230,7 +201,6 @@ resource "google_monitoring_alert_policy" "alert_error_log_policy" {
     }
   }
   notification_channels = [google_monitoring_notification_channel.error_monitoring_channel.id]
-  depends_on            = [google_project_service.services]
 }
 
 // based on gcp_resources/alter-function-not-executed-policy.json.tmpl
@@ -259,7 +229,6 @@ resource "google_monitoring_alert_policy" "alert_not_executed_policy" {
     }
   }
   notification_channels = [google_monitoring_notification_channel.error_monitoring_channel.id]
-  depends_on            = [google_project_service.services]
 }
 
 // based on gcp_resources/alert-function-error-policy.json.tmpl
@@ -283,76 +252,103 @@ resource "google_monitoring_alert_policy" "notification_alert_error_log_policy" 
     }
   }
   notification_channels = [google_monitoring_notification_channel.notification_error_monitoring_channel.id]
-  depends_on            = [google_project_service.services]
 }
 
 // Secret Manager //
 
-module "notification-secret" {
+module "notification_secret" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/secret-manager"
-  project_id = local.project_id
+  project_id = var.project_id
   secrets = {
-    "${local.notification_secret_name}" = [local.region]
+    "${local.notification_secret_name}" = [var.region]
   }
   versions = {
     "${local.notification_secret_name}" = {
       v1 = { enabled = true, data = "ADD YOUR SECRET CONTENT MANUALLY AND NOT HERE" }
     }
   }
-  depends_on = [google_project_service.services]
 }
 
 ////////////////////
 // Target Project //
 ////////////////////
 
-// Minimum APIs required //
-
-resource "google_project_service" "target_services" {
-  for_each                   = toset(var.target_services)
-  project                    = local.target_project_id
-  service                    = each.key
-  // Be aware of using as 'false' on development mode, since destroying will not disable the APIs
-  disable_dependent_services = false
-  disable_on_destroy         = false
-  timeouts {
-    create = "30m"
-    update = "40m"
-  }
-}
-
 // X-Project Permissions //
 
 resource "google_project_iam_binding" "target_project_iam_bq_data" {
-  project    = local.target_project_id
+  project    = var.target_project_id
   role       = "roles/bigquery.dataEditor"
-  members    = ["serviceAccount:${module.function_service_account.email}"]
-  depends_on = [google_project_service.target_services]
+  members    = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 resource "google_project_iam_binding" "target_project_iam_bq_job" {
-  project    = local.target_project_id
+  project    = var.target_project_id
   role       = "roles/bigquery.jobUser"
-  members    = ["serviceAccount:${module.function_service_account.email}"]
-  depends_on = [google_project_service.target_services]
+  members    = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 resource "google_project_iam_binding" "target_project_iam_gcs_obj_viewer" {
-  project    = local.target_project_id
+  project    = var.target_project_id
   role       = "roles/storage.objectViewer"
-  members    = ["serviceAccount:${module.function_service_account.email}"]
-  depends_on = [google_project_service.target_services]
+  members    = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 // GCS //
 
 module "request_bucket" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/gcs"
-  project_id = local.target_project_id
+  project_id = var.target_project_id
   prefix     = var.request_bucket_name_prefix
   name       = data.google_project.target_project.number
   iam = {
-    "roles/storage.legacyBucketReader" = ["serviceAccount:${module.function_service_account.email}"]
+    "roles/storage.legacyBucketReader" = ["serviceAccount:${module.sampler_service_account.email}"]
   }
-  depends_on = [google_project_service.target_services]
+}
+
+
+//////////////////////
+// Integ Tests Data //
+//////////////////////
+
+resource "google_bigquery_dataset" "integ_test_datasets" {
+  count         = var.create_integ_test_data ? length(var.integ_test_datasets) : 0
+  project       = var.project_id
+  dataset_id    = var.integ_test_datasets[count.index]
+  friendly_name = "${var.integ_test_datasets[count.index]}_clone"
+  description   = "Clone from ${var.integ_tests_project_id}:${var.integ_test_datasets[count.index]}}"
+  location      = var.region
+  access {
+    role          = "OWNER"
+    user_by_email = module.sampler_service_account.email
+  }
+  access {
+    role          = "OWNER"
+    special_group = "projectOwners"
+  }
+}
+
+resource "google_bigquery_data_transfer_config" "integ_test_data_transfer" {
+  count                  = length(google_bigquery_dataset.integ_test_datasets)
+  project                = var.project_id
+  location               = google_bigquery_dataset.integ_test_datasets[count.index].location
+  data_source_id         = "cross_region_copy"
+  display_name           = "Cloning job for ${google_bigquery_dataset.integ_test_datasets[count.index].dataset_id}"
+  destination_dataset_id = google_bigquery_dataset.integ_test_datasets[count.index].dataset_id
+  params                 = {
+    source_dataset_id           = google_bigquery_dataset.integ_test_datasets[count.index].dataset_id
+    source_project_id           = var.integ_tests_project_id
+    overwrite_destination_table = true
+  }
+  schedule               = "every monday 00:00"
+  schedule_options {
+    disable_auto_scheduling = true // turns it into a manual transfer
+  }
+  depends_on = [ google_project_iam_member.schedule_permissions ]
+}
+
+resource "google_project_iam_member" "schedule_permissions" {
+  count   = var.create_integ_test_data ? 1 : 0
+  project = var.project_id
+  role    = "roles/iam.serviceAccountShortTermTokenMinter"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
 }
