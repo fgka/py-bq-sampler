@@ -103,6 +103,7 @@ module "sampler" {
     BQ_LOCATION                = var.region
     TARGET_PROJECT_ID          = var.target_project_id
     POLICY_BUCKET_NAME         = module.policy_bucket.name
+    REQUEST_BUCKET_NAME        = module.request_bucket.name
     DEFAULT_POLICY_OBJECT_PATH = var.default_policy_object_path
     SAMPLING_LOCK_OBJECT_PATH  = var.sampling_lock_object_path
     CMD_TOPIC_NAME             = module.pubsub_cmd.id

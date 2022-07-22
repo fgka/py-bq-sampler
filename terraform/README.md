@@ -75,6 +75,8 @@ terraform init
 
 ## Plan
 
+Without integration test data:
+
 ```bash
 TMP=$(mktemp)
 terraform plan \
@@ -84,6 +86,20 @@ terraform plan \
   -var "region=${REGION}" \
   -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
 ```
+
+With integration test data:
+
+```bash
+TMP=$(mktemp)
+terraform plan \
+  -out ${TMP} \
+  -var "project_id=${PROJECT_ID}" \
+  -var "target_project_id=${TARGET_PROJECT_ID}" \
+  -var "region=${REGION}" \
+  -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}" \
+  -var "create_integ_test_data=true"
+```
+
 
 ## Apply
 
@@ -225,3 +241,50 @@ gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
   --location="${LOCATION}"
 ```
+
+## Integration tests
+
+There a couple of things you need to do before jumping into executing the integration tests:
+* Set some environment variables;
+* Trigger the BigQuery cloning jobs and wait for them to finish;
+* Execute the integration tests.
+
+### Set environment variables
+
+```bash
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export PROJECT_ID=$(jq -c -r '.sampler_function.value.project' ${OUT_JSON})
+export TARGET_PROJECT_ID=$(jq -c -r '.request_bucket.value.project' ${OUT_JSON})
+export REGION=$(jq -c -r '.sampler_function.value.region' ${OUT_JSON})
+export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
+export FUNCTION_SA=$(jq -c -r '.sampler_function_service_account.value.account_id' ${OUT_JSON})
+export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
+export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
+export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
+export POLICY_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
+export REQUEST_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.REQUEST_BUCKET_NAME' ${OUT_JSON})
+```
+
+### Trigger BigQuery cloning jobs
+
+This may take multiple minutes, be patient.
+
+```bash
+jq -r '.integ_test_data_transfer.value[].name' ${OUT_JSON} \
+  | while read TRANSFER_NAME
+    do
+      echo "Triggering transfer config: ${TRANSFER_NAME}"
+      bq mk --transfer_run \
+        --location=${REGION} \
+        --project_id=${PROJECT_ID} \
+        --run_time=$(date -u +%FT%TZ) \
+        ${TRANSFER_NAME}
+    done
+```
+
+### Execute the integration tests
+
+Go to [INTEG_TESTING.md](../code/INTEG_TESTING.md) and execute the shell script as indicated.
