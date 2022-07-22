@@ -5,9 +5,9 @@ and, in this sense, guide the validation of it.
 
 ## Request processing
 
-![img](doc/HighLevelRequestFlow.drawio.png)
+![img](doc/High%20level%20request%20flow.drawio.png)
 
-[Source](doc/HighLevelRequestFlow.drawio) ([draw.io](https://draw.io))
+[Source](doc/High%20level%20request%20flow.drawio) ([draw.io](https://draw.io))
 
 ## Pseudo-algorithm for policy compliance
 
