@@ -66,10 +66,27 @@ Typical times vary between 15 and 30 minutes to finish.
 
 ## Run manual integration tests
 
+Without deployment:
+
 ```bash
 rm -f integ_test.log
 ./bin/manual_integ_tests.sh \
   --no-deploy \
+  --log integ_test.log \
+  --prj-id ${PROJECT_ID} \
+  --tgt-prj-id ${TARGET_PROJECT_ID} \
+  --region ${REGION} \
+  --function ${FUNCTION_NAME} \
+  --cronjob ${SCHEDULER_JOB_NAME} \
+  --policy-bucket ${POLICY_BUCKET_NAME} \
+  --request-bucket ${REQUEST_BUCKET_NAME}
+```
+
+With deployment:
+
+```bash
+rm -f integ_test.log
+./bin/manual_integ_tests.sh \
   --log integ_test.log \
   --prj-id ${PROJECT_ID} \
   --tgt-prj-id ${TARGET_PROJECT_ID} \
