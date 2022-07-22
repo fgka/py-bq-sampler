@@ -277,21 +277,21 @@ module "notification_secret" {
 // X-Project Permissions //
 
 resource "google_project_iam_binding" "target_project_iam_bq_data" {
-  project    = var.target_project_id
-  role       = "roles/bigquery.dataEditor"
-  members    = ["serviceAccount:${module.sampler_service_account.email}"]
+  project = var.target_project_id
+  role    = "roles/bigquery.dataEditor"
+  members = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 resource "google_project_iam_binding" "target_project_iam_bq_job" {
-  project    = var.target_project_id
-  role       = "roles/bigquery.jobUser"
-  members    = ["serviceAccount:${module.sampler_service_account.email}"]
+  project = var.target_project_id
+  role    = "roles/bigquery.jobUser"
+  members = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 resource "google_project_iam_binding" "target_project_iam_gcs_obj_viewer" {
-  project    = var.target_project_id
-  role       = "roles/storage.objectViewer"
-  members    = ["serviceAccount:${module.sampler_service_account.email}"]
+  project = var.target_project_id
+  role    = "roles/storage.objectViewer"
+  members = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
 // GCS //
@@ -335,16 +335,16 @@ resource "google_bigquery_data_transfer_config" "integ_test_data_transfer" {
   data_source_id         = "cross_region_copy"
   display_name           = "Cloning job for ${google_bigquery_dataset.integ_test_datasets[count.index].dataset_id}"
   destination_dataset_id = google_bigquery_dataset.integ_test_datasets[count.index].dataset_id
-  params                 = {
+  params = {
     source_dataset_id           = google_bigquery_dataset.integ_test_datasets[count.index].dataset_id
     source_project_id           = var.integ_tests_project_id
     overwrite_destination_table = true
   }
-  schedule               = "every monday 00:00"
+  schedule = "every monday 00:00"
   schedule_options {
     disable_auto_scheduling = true // turns it into a manual transfer
   }
-  depends_on = [ google_project_iam_member.schedule_permissions ]
+  depends_on = [google_project_iam_member.schedule_permissions]
 }
 
 resource "google_project_iam_member" "schedule_permissions" {

@@ -21,7 +21,7 @@ variable "region" {
 variable "function_bundle_exclude_list_files" {
   description = "All files to provide exclude patterns in the function deployment."
   type        = list(string)
-  default     = [
+  default = [
     "../.gcloudignore",
     "../.gitignore",
     "function_bundle_extra_exclude.txt"
@@ -230,7 +230,7 @@ variable "integ_tests_project_id" {
 variable "integ_test_datasets" {
   description = "Which (public) BigQuery datasets to clone, from 'integ_tests_project_id'."
   type        = list(string)
-  default     = [
+  default = [
     "census_bureau_acs",
     "new_york_taxi_trips",
   ]
