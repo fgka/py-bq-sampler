@@ -58,6 +58,18 @@ do
         \"source_dataset_id\":\"${DS_ID}\",
         \"overwrite_destination_table\":\"true\"
       }"
+    TRANSFER_NAME=$(bq ls \
+      --transfer_config \
+      --transfer_location=${REGION} \
+      --project_id=${PROJECT_ID} \
+      --format=json \
+      | jq --arg ds_id ${DS_ID} -r '.[] | select(.destinationDatasetId==$ds_id) | .name')
+    bq mk --transfer_run \
+      --location=${REGION} \
+      --project_id=${PROJECT_ID} \
+      --run_time=$(date -u +%FT%TZ) \
+      ${TRANSFER_NAME}
+      
 done
 ```
 
