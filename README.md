@@ -6,9 +6,9 @@ Inside `code` you have also the instructions on how to manually deploy the infra
  and manually test it end-to-end.
 Main documents:
 
-* [Infrastructure](INFRASTRUCTURE.md)
-* [Deploy](DEPLOY.md)
-* [Integration Tests](INTEG_TESTING.md)
+* [Infrastructure](./code/INFRASTRUCTURE.md)
+* [Deploy](./code/DEPLOY.md)
+* [Integration Tests](./code/INTEG_TESTING.md)
 
 ## [Design](./code/DESIGN.md)
 
