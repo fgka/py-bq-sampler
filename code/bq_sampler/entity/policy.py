@@ -119,7 +119,7 @@ class Policy(attrs_defaults.HasFromJsonString):  # pylint: disable=too-few-publi
                 f'Sample must be of type {table.Sample.__name__}.'
                 f' Got <{sample}>({type(sample)})'
             )
-        if not isinstance(row_count, (int, float)) or row_count <= 0:
+        if not isinstance(row_count, (int, float)) or row_count < 0:
             raise ValueError(
                 f'Row count must be an integer greater than 0. Got <{row_count}>({type(row_count)})'
             )

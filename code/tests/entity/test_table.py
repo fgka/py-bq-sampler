@@ -41,8 +41,6 @@ class TestSizeSpec:
     @pytest.mark.parametrize(
         'count,percentage',
         [
-            (0, None),
-            (-0, None),
             (-1, None),  # count is negative
             (None, 0),
             (None, -0),
