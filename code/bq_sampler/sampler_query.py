@@ -144,9 +144,9 @@ def _validate_str_args(*args) -> Tuple[str]:
 
 
 def _validate_amount(amount: int) -> None:
-    if not isinstance(amount, int) or amount <= 0:
+    if not isinstance(amount, int) or amount < 0:
         raise ValueError(
-            f'Amount must be an int greater than 0. Got: amount:{type(amount)}=<{amount}>'
+            f'Amount must be an int greater or equal 0. Got: amount:{type(amount)}=<{amount}>'
         )
 
 

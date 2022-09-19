@@ -124,7 +124,6 @@ def _mock_calls_bq(
         (_TEST_SOURCE_TABLE_REF, None),
         (None, _TEST_SAMPLE_AMOUNT),
         (_TEST_SOURCE_TABLE_FQN_ID, _TEST_SAMPLE_AMOUNT),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, 0),  # amount <= 0
         (_TEST_SOURCE_TABLE_REF, -1),
     ],
 )
@@ -169,7 +168,6 @@ def test_sorted_sample_ok(monkeypatch):
             _TEST_SORT_COLUMN_NAME,
             _TEST_SORT_ORDER,
         ),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, 0, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),  # amount <= 0
         (_TEST_SOURCE_TABLE_REF, -1, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),
         (
             _TEST_SOURCE_TABLE_REF,
@@ -275,7 +273,6 @@ def test_create_table_with_random_sample_ok(monkeypatch):
             _TEST_TARGET_DIFF_LOC_TABLE_REF,
             _TEST_SAMPLE_AMOUNT,
         ),  # different regions
-        (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, 0),  # amount <=0
         (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, -1),
     ],
 )
@@ -353,13 +350,6 @@ def test_create_table_with_sorted_sample_ok(monkeypatch):
             _TEST_SORT_COLUMN_NAME,
             _TEST_SORT_ORDER,
         ),  # different regions
-        (
-            _TEST_SOURCE_TABLE_REF,
-            _TEST_TARGET_TABLE_REF,
-            0,
-            _TEST_SORT_COLUMN_NAME,
-            _TEST_SORT_ORDER,
-        ),  # amount <=0
         (
             _TEST_SOURCE_TABLE_REF,
             _TEST_TARGET_TABLE_REF,
