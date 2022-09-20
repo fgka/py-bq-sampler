@@ -241,12 +241,13 @@ def test__named_placeholders_ok():
     assert result.get(sampler_query._BQ_ORDER_BY_DIRECTION) == order
 
 
-def test__int_percent_for_tablesample_stmt_nok_empty_table(monkeypatch):
+def test__int_percent_for_tablesample_stmt_ok_empty_table(monkeypatch):
     # Given
     _mock_calls_bq(monkeypatch, row_count=0)
-    # When/Then
-    with pytest.raises(ValueError):
-        sampler_query._int_percent_for_tablesample_stmt(_TEST_SOURCE_TABLE_FQN_ID, 1)
+    # When
+    result = sampler_query._int_percent_for_tablesample_stmt(_TEST_SOURCE_TABLE_FQN_ID, 1)
+    # Then
+    assert result == 0
 
 
 def test_create_table_with_random_sample_ok(monkeypatch):

@@ -191,12 +191,16 @@ def _named_placeholders(  # pylint: disable=too-many-arguments
 
 def _int_percent_for_tablesample_stmt(table_fqn_id: str, amount: int) -> int:
     size = bq.row_count(table_fqn_id=table_fqn_id)
-    if not isinstance(size, int) or size <= 0:
+    if not isinstance(size, int) or size < 0:
         raise ValueError(
-            f'Table {table_fqn_id} number of rows must be greater than 0. Got: <{size}>'
+            f'Table {table_fqn_id} number of rows must be greater or equal 0. Got: <{size}>'
         )
-    percent = int(math.ceil(amount / size * 100.0))
-    return min(100, max(1, percent))
+    if size == 0:
+        result = 0
+    else:
+        percent = int(math.ceil(amount / size * 100.0))
+        result = min(100, max(1, percent))
+    return result
 
 
 def sorted_sample(
