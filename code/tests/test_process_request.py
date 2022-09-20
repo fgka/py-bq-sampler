@@ -161,7 +161,7 @@ def test__process_start_ok(monkeypatch):
     # Then
     assert called_drop
     assert called_publish
-    assert len(sample_start_req_lst) == 6
+    assert len(sample_start_req_lst) == 7
     for start_req in sample_start_req_lst:
         assert start_req.target_table.project_id == config.target_project_id
 

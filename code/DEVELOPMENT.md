@@ -25,13 +25,13 @@ You might also need [https://github.com/jiansoung/issues-list/issues/13#issuecom
 Set python 3.9 as default:
 
 ```basn
-pyenv install 3.9.10
+pyenv install 3.9.12
 ```
 
 Set pyenv defaults:
 ```bash
-pyenv global 3.9.10
-pyenv local 3.9.10
+pyenv global 3.9.12
+pyenv local 3.9.12
 ```
 
 ### Virtualenv
@@ -71,7 +71,7 @@ Python 3.9.10
 Install packages:
 
 ```bash
-pip install -U pip wheel setuptools
+pip3 install -U pip wheel setuptools
 ```
 
 ## Install all dependencies
@@ -79,7 +79,8 @@ pip install -U pip wheel setuptools
 Install packages:
 
 ```bash
-pip install ".[all]"
+pip3 install ".[all]" \
+  &&  pip3 uninstall --yes $(python3 ./setup.py --name)
 ```
 
 ## Auto-formatting with black

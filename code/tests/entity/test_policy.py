@@ -112,6 +112,15 @@ class TestPolicy:
         assert result.size.percentage is None
         assert result.size.count == sample.size.count
 
+    def test_compliant_sample_nok_empty_table(self):
+        # Given
+        obj = sample_policy_data.TEST_POLICY
+        sample = sample_policy_data.TEST_SAMPLE
+        # When
+        result = obj.compliant_sample(sample, 0)
+        # Then
+        assert result.size.percentage is None
+        assert result.size.count == 0
 
 @pytest.mark.incremental
 class TestTablePolicy:

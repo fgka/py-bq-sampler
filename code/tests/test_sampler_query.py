@@ -124,7 +124,6 @@ def _mock_calls_bq(
         (_TEST_SOURCE_TABLE_REF, None),
         (None, _TEST_SAMPLE_AMOUNT),
         (_TEST_SOURCE_TABLE_FQN_ID, _TEST_SAMPLE_AMOUNT),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, 0),  # amount <= 0
         (_TEST_SOURCE_TABLE_REF, -1),
     ],
 )
@@ -169,7 +168,6 @@ def test_sorted_sample_ok(monkeypatch):
             _TEST_SORT_COLUMN_NAME,
             _TEST_SORT_ORDER,
         ),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, 0, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),  # amount <= 0
         (_TEST_SOURCE_TABLE_REF, -1, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),
         (
             _TEST_SOURCE_TABLE_REF,
@@ -243,12 +241,13 @@ def test__named_placeholders_ok():
     assert result.get(sampler_query._BQ_ORDER_BY_DIRECTION) == order
 
 
-def test__int_percent_for_tablesample_stmt_nok_empty_table(monkeypatch):
+def test__int_percent_for_tablesample_stmt_ok_empty_table(monkeypatch):
     # Given
     _mock_calls_bq(monkeypatch, row_count=0)
-    # When/Then
-    with pytest.raises(ValueError):
-        sampler_query._int_percent_for_tablesample_stmt(_TEST_SOURCE_TABLE_FQN_ID, 1)
+    # When
+    result = sampler_query._int_percent_for_tablesample_stmt(_TEST_SOURCE_TABLE_FQN_ID, 1)
+    # Then
+    assert result == 0
 
 
 def test_create_table_with_random_sample_ok(monkeypatch):
@@ -275,7 +274,6 @@ def test_create_table_with_random_sample_ok(monkeypatch):
             _TEST_TARGET_DIFF_LOC_TABLE_REF,
             _TEST_SAMPLE_AMOUNT,
         ),  # different regions
-        (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, 0),  # amount <=0
         (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, -1),
     ],
 )
@@ -353,13 +351,6 @@ def test_create_table_with_sorted_sample_ok(monkeypatch):
             _TEST_SORT_COLUMN_NAME,
             _TEST_SORT_ORDER,
         ),  # different regions
-        (
-            _TEST_SOURCE_TABLE_REF,
-            _TEST_TARGET_TABLE_REF,
-            0,
-            _TEST_SORT_COLUMN_NAME,
-            _TEST_SORT_ORDER,
-        ),  # amount <=0
         (
             _TEST_SOURCE_TABLE_REF,
             _TEST_TARGET_TABLE_REF,

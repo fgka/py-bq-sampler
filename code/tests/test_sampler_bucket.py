@@ -61,6 +61,7 @@ _MANDATORY_PRESENT_POLICIES: Set[str] = set(
     [
         'empty_policy',
         'non_json',
+        'non_json_b',
         'policy_full',
         'policy_full_again',
         'policy_full_simple_default_sample',
@@ -79,7 +80,7 @@ def test_all_policies_ok(monkeypatch):
         table_id = t_pol.table_reference.table_id
         tables.add(table_id)
         # Then
-        if table_id in ('empty_policy', 'non_json'):
+        if table_id in ('empty_policy', 'non_json', 'non_json_b'):
             _is_same_as_default(table_id, t_pol.policy, default_policy, True, True)
         elif table_id in ('policy_full', 'policy_full_again', 'policy_full_simple_default_sample'):
             _is_same_as_default(table_id, t_pol.policy, default_policy, False, False)
