@@ -7,6 +7,7 @@
 from bq_sampler.entity import command
 from bq_sampler.entity import table
 
+_TEST_POLICY_PREFIX: str = 'project_id_a/dataset_id_a'
 _TEST_SOURCE_PROJECT_ID: str = 'TEST_SOURCE_PROJECT_ID'
 _TEST_TARGET_PROJECT_ID: str = 'TEST_TARGET_PROJECT_ID'
 _TEST_DATASET_ID: str = 'TEST_DATASET_ID'
@@ -52,6 +53,13 @@ TEST_COMMAND_SAMPLE_START: command.CommandSampleStart = command.CommandSampleSta
     timestamp=17,
     sample_request=_TEST_SAMPLE_REQUEST,
     target_table=_TEST_TARGET_TABLE_REF,
+)
+TEST_COMMAND_SAMPLE_POLICY_PREFIX: command.CommandSamplePolicyPrefix = (
+    command.CommandSamplePolicyPrefix(
+        type=command.CommandType.SAMPLE_POLICY_PREFIX.value,
+        timestamp=17,
+        prefix=_TEST_POLICY_PREFIX,
+    )
 )
 TEST_COMMAND_SAMPLE_START_RANDOM: command.CommandSampleStart = command.CommandSampleStart(
     type=command.CommandType.SAMPLE_START.value,

@@ -17,6 +17,7 @@ class CommandType(attrs_defaults.EnumWithFromStrIgnoreCase):
     """
 
     START = const.REQUEST_TYPE_START
+    SAMPLE_POLICY_PREFIX = const.REQUEST_TYPE_SAMPLE_POLICY_PREFIX
     SAMPLE_START = const.REQUEST_TYPE_SAMPLE_START
     SAMPLE_DONE = const.REQUEST_TYPE_SAMPLE_DONE
 
@@ -47,6 +48,15 @@ class CommandStart(CommandBase):  # pylint: disable=too-few-public-methods
     To represent a command to start the sampling.
     This is the trigger of it all.
     """
+
+
+@attrs.define(**const.ATTRS_DEFAULTS)
+class CommandSamplePolicyPrefix(CommandBase):  # pylint: disable=too-few-public-methods
+    """
+    A signal to indicate that a specific GCS policy bucket prefix will be processed.
+    """
+
+    prefix: str = attrs.field(validator=attrs.validators.instance_of(str))
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)

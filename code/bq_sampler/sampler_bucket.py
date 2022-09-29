@@ -9,6 +9,7 @@ List all project IDs that should be sampled. It assumes the following structure 
                           table that overwrites the default, if valid.
 
 """
+import logging
 from typing import Any, Callable, Generator, Optional, Tuple
 
 from bq_sampler import const
@@ -21,7 +22,10 @@ _LOGGER = logger.get(__name__)
 
 
 def all_policies(
-    bucket_name: str, default_policy_object_path: str, location: Optional[str] = None
+    bucket_name: str,
+    default_policy_object_path: str,
+    location: Optional[str] = None,
+    prefix: Optional[str] = None,
 ) -> Generator[policy.TablePolicy, None, None]:
     """
     The output is already containing the realized policies, i.e.,
@@ -30,6 +34,7 @@ def all_policies(
     :param bucket_name:
     :param default_policy_object_path:
     :param location:
+    :param prefix: limits the search by prefix
     :return:
     """
     _LOGGER.info(
@@ -40,7 +45,7 @@ def all_policies(
     # default policy
     default_policy = _default_policy(bucket_name, default_policy_object_path)
     # all policies
-    for table_policy in _retrieve_all_table_policies(bucket_name, default_policy, location):
+    for table_policy in _retrieve_all_table_policies(bucket_name, default_policy, location, prefix):
         yield table_policy
 
 
@@ -65,15 +70,20 @@ def _overwritten_policy_from_gcs(
     return result
 
 
-def _fetch_gcs_object_as_string(bucket_name: str, object_path: str) -> str:
+def _fetch_gcs_object_as_string(
+    bucket_name: str, object_path: str, warn_read_failure: Optional[bool] = True
+) -> str:
     result = None
     try:
-        content = gcs.read_object(bucket_name, object_path)
+        content = gcs.read_object(bucket_name, object_path, warn_read_failure)
         if content is not None:
             result = content.decode('utf-8')
         else:
-            _LOGGER.warning(
-                'No content to decode for bucket %s and object %s', bucket_name, object_path
+            _LOGGER.log(
+                logging.WARN if warn_read_failure else logging.INFO,
+                'No content to decode for bucket %s and object %s',
+                bucket_name,
+                object_path,
             )
     except Exception as err:  # pylint: disable=broad-except
         _LOGGER.warning(
@@ -99,14 +109,19 @@ def _overwrite_policy(
 
 
 def _retrieve_all_table_policies(
-    bucket_name: str, default_policy: policy.Policy, location: Optional[str] = None
+    bucket_name: str,
+    default_policy: policy.Policy,
+    location: Optional[str] = None,
+    prefix: Optional[str] = None,
 ) -> Generator[policy.TablePolicy, None, None]:
     def convert_fn(table_reference, obj_path) -> policy.TablePolicy:
         actual_policy = _overwritten_policy_from_gcs(bucket_name, obj_path, default_policy)
         result = policy.TablePolicy(table_reference=table_reference, policy=actual_policy)
         return result
 
-    for table_policy in _retrieve_all_with_table_reference(bucket_name, convert_fn, location):
+    for table_policy in _retrieve_all_with_table_reference(
+        bucket_name, convert_fn, location, prefix
+    ):
         yield table_policy
 
 
@@ -114,19 +129,22 @@ def _retrieve_all_with_table_reference(
     bucket_name: str,
     convert_fn: Callable[[table.TableReference, str], Any],
     location: Optional[str] = None,
+    prefix: Optional[str] = None,
 ) -> Generator[Any, None, None]:
 
-    for table_reference, obj_path in _list_all_table_references_obj_path(bucket_name, location):
+    for table_reference, obj_path in _list_all_table_references_obj_path(
+        bucket_name, location, prefix
+    ):
         yield convert_fn(table_reference, obj_path)
 
 
 def _list_all_table_references_obj_path(
-    bucket_name: str, location: Optional[str] = None
+    bucket_name: str, location: Optional[str] = None, prefix: Optional[str] = None
 ) -> Generator[Tuple[table.TableReference, str], None, None]:
     def filter_fn(value: str) -> bool:
         return value.endswith(const.JSON_EXT) and len(value.split('/')) == 3
 
-    for obj_path in gcs.list_objects(bucket_name, filter_fn):
+    for obj_path in gcs.list_objects(bucket_name, filter_fn, prefix):
         project_id, dataset_id, table_id_file = obj_path.split('/')
         table_id = table_id_file[: -len(const.JSON_EXT)]
         table_reference = table.TableReference(
@@ -167,7 +185,9 @@ def _retrieve_all_sample_requests(
 
 
 def _sample_request(bucket_name: str, request_filename: str) -> table.Sample:
-    sample_json_string: str = _fetch_gcs_object_as_string(bucket_name, request_filename)
+    sample_json_string: str = _fetch_gcs_object_as_string(
+        bucket_name, request_filename, warn_read_failure=False
+    )
     result = table.Sample.from_json(sample_json_string)
     return result
 
@@ -226,5 +246,7 @@ def is_sampling_lock_present(bucket_name: str, sampling_lock_object_path: str) -
         bucket_name,
         sampling_lock_object_path,
     )
-    obj_content = _fetch_gcs_object_as_string(bucket_name, sampling_lock_object_path)
+    obj_content = _fetch_gcs_object_as_string(
+        bucket_name, sampling_lock_object_path, warn_read_failure=False
+    )
     return obj_content is not None

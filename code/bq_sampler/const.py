@@ -26,6 +26,12 @@ ATTRS_DEFAULTS: Dict[str, bool] = dict(
 )
 
 
+###################
+#  Cloud Storage  #
+###################
+
+GS_PREFIX_DELIM: str = '/'
+
 ##########################
 #  Samples and Policies  #
 ##########################
@@ -57,6 +63,7 @@ Default GCP resource label to be applied table created here.
 #############
 
 REQUEST_TYPE_START = 'START'
+REQUEST_TYPE_SAMPLE_POLICY_PREFIX = 'SAMPLE_POLICY_PREFIX'
 REQUEST_TYPE_SAMPLE_START = 'SAMPLE_START'
 REQUEST_TYPE_SAMPLE_DONE = 'SAMPLE_DONE'
 
