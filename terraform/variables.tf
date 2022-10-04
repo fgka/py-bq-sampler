@@ -72,19 +72,19 @@ variable "sampling_lock_object_path" {
 
 variable "sampler_function_max_instances" {
   description = "The maximum amount of concurrent instances for processing sampling commands."
-  type        = int
+  type        = number
   default     = 1000
 }
 
 variable "sampler_function_memory" {
   description = "The memory allocation for function in MB."
-  type        = int
+  type        = number
   default     = 512
 }
 
 variable "sampler_function_timeout" {
   description = "The sampler function timeout in seconds."
-  type        = int
+  type        = number
   default     = 540
 }
 
@@ -118,7 +118,7 @@ variable "sampler_service_account_name" {
 
 variable "notification_function_max_instances" {
   description = "The maximum amount of concurrent instances for notification."
-  type        = int
+  type        = number
   default     = 10
 }
 
