@@ -8,6 +8,7 @@ GCP `CloudFunction`_ entry point
 from datetime import datetime
 import calendar
 import os
+import re
 from typing import Any, Dict, Optional
 
 from bq_sampler import process_request
@@ -67,7 +68,7 @@ def _from_pubsub_to_cmd(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     # Zulu timezone = UTC
     # https://en.wikipedia.org/wiki/List_of_military_time_zones
     iso_zulu_datetime = context.timestamp
-    plain_iso_dateime = iso_zulu_datetime.replace('Z', '+00:00')
+    plain_iso_dateime = re.sub(r'\.[0-9]*Z', '+00:00', iso_zulu_datetime)
     try:
         timestamp: int = calendar.timegm(datetime.fromisoformat(plain_iso_dateime).utctimetuple())
     except Exception as err:

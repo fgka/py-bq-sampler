@@ -36,10 +36,11 @@ def _read_bytes(file_path: pathlib.Path) -> Dict[str, Any]:
 
 
 def get_gcs_prefixes_http_iterator(bucket_name: str, prefix: str) -> Generator[str, None, None]:
-    path = _TEST_DATA_DIR.joinpath(bucket_name).joinpath(prefix)
+    root_path = _TEST_DATA_DIR.joinpath(bucket_name)
+    path = root_path.joinpath(prefix)
     for item in path.iterdir():
         if item.is_dir():
-            yield f'{item.relative_to(path)}/'
+            yield f'{item.relative_to(root_path)}/'
 
 
 def list_blob_names(bucket_name: str, prefix: str) -> Generator[str, None, None]:

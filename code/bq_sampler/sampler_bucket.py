@@ -66,7 +66,7 @@ def _overwritten_policy_from_gcs(
     bucket_name: str, policy_object_path: str, fallback_policy: policy.Policy
 ) -> policy.Policy:
     policy_json_string: str = _fetch_gcs_object_as_string(bucket_name, policy_object_path)
-    result = _overwrite_policy(policy.Policy.from_json(policy_json_string), fallback_policy)
+    result = _overwrite_policy(policy.Policy.from_json(policy_json_string, f'gs://{bucket_name}/{policy_object_path}'), fallback_policy)
     return result
 
 
@@ -188,7 +188,7 @@ def _sample_request(bucket_name: str, request_filename: str) -> table.Sample:
     sample_json_string: str = _fetch_gcs_object_as_string(
         bucket_name, request_filename, warn_read_failure=False
     )
-    result = table.Sample.from_json(sample_json_string)
+    result = table.Sample.from_json(sample_json_string, f'gs://{bucket_name}/{request_filename}')
     return result
 
 

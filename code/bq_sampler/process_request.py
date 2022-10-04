@@ -18,6 +18,7 @@ _BQ_LOCATION_ENV_VAR: str = 'BQ_LOCATION'  # europe-west3
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default_policy.json
+_DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH: str = 'default_policy.json'
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'  # my-request-bucket
 _PUBSUB_CMD_TOPIC_ENV_VAR: str = 'CMD_TOPIC_NAME'  # projects/py-project-12345/topics/cmd-topic-name
 _PUBSUB_ERROR_TOPIC_ENV_VAR: str = (
@@ -35,7 +36,7 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
-        self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR)
+        self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, _DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH)
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
@@ -100,7 +101,7 @@ def _process(cmd: command.CommandBase) -> None:
     if cmd.type == command.CommandType.START.value:
         _process_start(cmd)
     elif cmd.type == command.CommandType.SAMPLE_POLICY_PREFIX.value:
-        _process_sample_policy_prefix()
+        _process_sample_policy_prefix(cmd)
     elif cmd.type == command.CommandType.SAMPLE_START.value:
         _process_sample_start(cmd)
     elif cmd.type == command.CommandType.SAMPLE_DONE.value:
@@ -114,7 +115,7 @@ def _process_start(cmd: command.CommandStart) -> None:
     Will inspect the policy and requests buckets,
         apply compliance,
         and issue a sampling request for all targeted tables.
-    It will also generate a :py:class:`command.CommandSampleStart` for each one
+    It will also generate a :py:class:`command.CommandSampleStart` for each one'
         and send it out into the Pub/Sub topic.
 
     :param cmd:

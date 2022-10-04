@@ -167,18 +167,17 @@ def _list_prefixes_ok(
 ) -> Generator[str, None, None]:
     # logic
     for item in _get_gcs_prefixes_http_iterator(bucket_name, prefix):
-        full_path = f'{prefix}{item}'
-        _LOGGER.debug("Prefix <%s> in bucket <%s>", full_path, bucket_name)
+        _LOGGER.debug("Found prefix <%s> in <%s> in bucket <%s>", item, prefix, bucket_name)
         try:
-            if filter_fn(full_path):
-                yield full_path
+            if filter_fn(item):
+                yield item
         except Exception as err:
             raise CloudStorageListError(
                 f'Could not add prefix named <{item}> in <{prefix}> from bucket <{bucket_name}>. '
                 f'Stopping list now. Error: <{err}>'
             ) from err
         # recursion
-        for sub_item in _list_prefixes_ok(bucket_name, full_path, filter_fn):
+        for sub_item in _list_prefixes_ok(bucket_name, item, filter_fn):
             yield sub_item
 
 

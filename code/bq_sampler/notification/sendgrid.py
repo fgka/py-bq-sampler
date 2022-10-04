@@ -54,7 +54,7 @@ def event_to_msg_fn(event_data: Union[str, bytes]) -> mail.Mail:
 def _config() -> config.SendGrid:
     bucket_name, object_path = gcs.bucket_path_from_uri(_general_config().sendgrid_config_uri)
     content = gcs.read_object(bucket_name, object_path)
-    return config.SendGrid.from_json(content)
+    return config.SendGrid.from_json(content, f'gs://{bucket_name}/{object_path}')
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
