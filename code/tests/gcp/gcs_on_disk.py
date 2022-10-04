@@ -14,7 +14,9 @@ REQUEST_BUCKET: str = 'request_bucket'
 _TEST_DATA_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.parent.joinpath('test_data')
 
 
-def read_object(bucket_name: str, object_path: str, warn_read_failure: Optional[bool] = True) -> bytes:
+def read_object(
+    bucket_name: str, object_path: str, warn_read_failure: Optional[bool] = True
+) -> bytes:
     """
     To mimic `gcp_storage.read_object(bucket_name, object_path)`.
     :param bucket_name:

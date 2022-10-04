@@ -244,7 +244,9 @@ def test__process_sample_policy_prefix_ok(monkeypatch):
     assert called.get('called_publish')
 
 
-def _mock_publish_sample_start(monkeypatch, called: Dict[str, bool], called_key: str, topic: str) -> None:
+def _mock_publish_sample_start(
+    monkeypatch, called: Dict[str, bool], called_key: str, topic: str
+) -> None:
     def mocked_publish(value: Dict[str, Any], topic_path: str) -> str:
         nonlocal called
         assert topic_path == topic

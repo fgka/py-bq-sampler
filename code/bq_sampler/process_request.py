@@ -36,7 +36,9 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
-        self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, _DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH)
+        self._default_policy_path = os.environ.get(
+            _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, _DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH
+        )
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
@@ -182,6 +184,7 @@ def _process_sample_policy_prefix_ok(cmd: command.CommandSamplePolicyPrefix) -> 
         _general_config().policy_bucket,
         cmd.prefix,
     )
+    errors = []
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
         default_policy_object_path=_general_config().default_policy_path,
@@ -194,16 +197,23 @@ def _process_sample_policy_prefix_ok(cmd: command.CommandSamplePolicyPrefix) -> 
             _general_config().request_bucket,
             cmd.prefix,
         )
-        table_sample = sampler_bucket.sample_request_from_policy(
-            bucket_name=_general_config().request_bucket,
-            table_policy=table_policy,
-        )
-        # compliance enforcement
-        table_sample = _compliant_sample_request(table_policy, table_sample)
-        # create sample request event
-        start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
-        # send request out
-        _publish_cmd_to_pubsub(start_sample_req)
+        try:
+            table_sample = sampler_bucket.sample_request_from_policy(
+                bucket_name=_general_config().request_bucket,
+                table_policy=table_policy,
+            )
+            # compliance enforcement
+            table_sample = _compliant_sample_request(table_policy, table_sample)
+            # create sample request event
+            start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
+            # send request out
+            _publish_cmd_to_pubsub(start_sample_req)
+        except Exception as err:
+            msg = f'Ignoring sampling for policy {table_policy} due to error: {err}'
+            errors.append(msg)
+            _LOGGER.error(msg)
+    if errors:
+        raise RuntimeError(f'Failed command {cmd} with error(s): {errors}')
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
