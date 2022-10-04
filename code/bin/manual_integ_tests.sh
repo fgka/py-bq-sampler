@@ -736,7 +736,7 @@ function deploy_function {
   ENV_VARS+=("SAMPLING_LOCK_OBJECT_PATH=${SAMPLING_LOCK_OBJECT_PATH}")
   ENV_VARS+=("CMD_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_CMD_TOPIC}")
   ENV_VARS+=("ERROR_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_ERROR_TOPIC}")
-  ENV_VARS+=("LOG_LEVEL=DEBUG")
+  ENV_VARS+=("LOG_LEVEL=${LOG_LEVEL}")
   local ENV_VARS_COMMA=$(
     local IFS=","
     echo "${ENV_VARS[*]}"
@@ -1045,6 +1045,7 @@ function main {
   if [ "${DEPLOY}" == "YES" ]; then
     deploy_function
   fi
+  read -n 1 -p "To start tests, press <ENTER>:" TO_IGNORE
   clean_up
   # run tests
   first_empty_policy
