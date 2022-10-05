@@ -9,8 +9,8 @@ import cachetools
 
 from bq_sampler.entity import command, table, policy
 from bq_sampler import sampler_bucket, sampler_query
-from bq_sampler.gcp import pubsub
-from bq_sampler import logger
+from bq_sampler.gcp import gcs, pubsub
+from bq_sampler import const, logger
 
 _LOGGER = logger.get(__name__)
 
@@ -18,6 +18,7 @@ _BQ_LOCATION_ENV_VAR: str = 'BQ_LOCATION'  # europe-west3
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default_policy.json
+_DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH: str = 'default_policy.json'
 _GCS_REQUEST_BUCKET_ENV_VAR: str = 'REQUEST_BUCKET_NAME'  # my-request-bucket
 _PUBSUB_CMD_TOPIC_ENV_VAR: str = 'CMD_TOPIC_NAME'  # projects/py-project-12345/topics/cmd-topic-name
 _PUBSUB_ERROR_TOPIC_ENV_VAR: str = (
@@ -35,7 +36,9 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
-        self._default_policy_path = os.environ.get(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR)
+        self._default_policy_path = os.environ.get(
+            _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, _DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH
+        )
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
@@ -99,6 +102,8 @@ def process(cmd: command.CommandBase) -> None:
 def _process(cmd: command.CommandBase) -> None:
     if cmd.type == command.CommandType.START.value:
         _process_start(cmd)
+    elif cmd.type == command.CommandType.SAMPLE_POLICY_PREFIX.value:
+        _process_sample_policy_prefix(cmd)
     elif cmd.type == command.CommandType.SAMPLE_START.value:
         _process_sample_start(cmd)
     elif cmd.type == command.CommandType.SAMPLE_DONE.value:
@@ -112,7 +117,7 @@ def _process_start(cmd: command.CommandStart) -> None:
     Will inspect the policy and requests buckets,
         apply compliance,
         and issue a sampling request for all targeted tables.
-    It will also generate a :py:class:`command.CommandSampleStart` for each one
+    It will also generate a :py:class:`command.CommandSampleStart` for each one'
         and send it out into the Pub/Sub topic.
 
     :param cmd:
@@ -136,27 +141,79 @@ def _process_start_ok(cmd: command.CommandStart) -> None:
     sampler_query.drop_all_sample_tables(
         project_id=_general_config().target_project_id, location=_general_config().location
     )
-    _LOGGER.debug('Retrieving all policies from bucket <%s>', _general_config().policy_bucket)
+
+    def prefix_filter_fn(full_path: str) -> bool:
+        return len(full_path.strip(const.GS_PREFIX_DELIM).split(const.GS_PREFIX_DELIM)) == 2
+
+    for prefix in gcs.list_prefixes(
+        bucket_name=_general_config().policy_bucket, filter_fn=prefix_filter_fn
+    ):
+        _LOGGER.debug('Sending request for prefix: %s', prefix)
+        # create sample for prefix request event
+        sample_policy_prefix_req = _create_sample_policy_prefix_cmd(cmd, prefix)
+        # send request out
+        _publish_cmd_to_pubsub(sample_policy_prefix_req)
+
+
+def _create_sample_policy_prefix_cmd(
+    cmd: command.CommandStart, prefix: str
+) -> command.CommandSamplePolicyPrefix:
+    kwargs = {
+        command.CommandSamplePolicyPrefix.type.__name__: command.CommandType.SAMPLE_POLICY_PREFIX.value,
+        command.CommandSamplePolicyPrefix.timestamp.__name__: cmd.timestamp,
+        command.CommandSamplePolicyPrefix.prefix.__name__: prefix,
+    }
+    return command.CommandSamplePolicyPrefix(**kwargs)
+
+
+def _process_sample_policy_prefix(cmd: command.CommandSamplePolicyPrefix) -> None:
+    """
+    Will list all policies in the policy bucket but restricted to the given prefix in `cmd`.
+    For each policy will issue the corresponding :py:class:`command.CommandSampleStart`.
+
+    :param cmd:
+    :return:
+    """
+    _LOGGER.info('Issuing sample command <%s>', cmd)
+    _process_sample_policy_prefix_ok(cmd)
+
+
+def _process_sample_policy_prefix_ok(cmd: command.CommandSamplePolicyPrefix) -> None:
+    _LOGGER.debug(
+        'Retrieving all policies from bucket <%s> and prefix <%s>',
+        _general_config().policy_bucket,
+        cmd.prefix,
+    )
+    errors = []
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
         default_policy_object_path=_general_config().default_policy_path,
         location=_general_config().location,
+        prefix=cmd.prefix,
     ):
         _LOGGER.info(
-            'Retrieving request, if existent, for table <%s> from bucket <%s>',
+            'Retrieving request, if existent, for table <%s> from bucket <%s> and prefix <%s>',
             table_policy,
             _general_config().request_bucket,
+            cmd.prefix,
         )
-        table_sample = sampler_bucket.sample_request_from_policy(
-            bucket_name=_general_config().request_bucket,
-            table_policy=table_policy,
-        )
-        # compliance enforcement
-        table_sample = _compliant_sample_request(table_policy, table_sample)
-        # create sample request event
-        start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
-        # send request out
-        _publish_cmd_to_pubsub(start_sample_req)
+        try:
+            table_sample = sampler_bucket.sample_request_from_policy(
+                bucket_name=_general_config().request_bucket,
+                table_policy=table_policy,
+            )
+            # compliance enforcement
+            table_sample = _compliant_sample_request(table_policy, table_sample)
+            # create sample request event
+            start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
+            # send request out
+            _publish_cmd_to_pubsub(start_sample_req)
+        except Exception as err:
+            msg = f'Ignoring sampling for policy {table_policy} due to error: {err}'
+            errors.append(msg)
+            _LOGGER.error(msg)
+    if errors:
+        raise RuntimeError(f'Failed command {cmd} with error(s): {errors}')
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
@@ -172,7 +229,7 @@ def _compliant_sample_request(
 
 
 def _create_sample_start_cmd(
-    cmd: command.CommandStart,
+    cmd: command.CommandSamplePolicyPrefix,
     table_policy: policy.TablePolicy,
     table_sample: table.TableSample,
 ) -> command.CommandSampleStart:
@@ -258,3 +315,15 @@ def _process_sample_done(cmd: command.CommandSampleDone) -> None:
     :return:
     """
     _LOGGER.info('Completed sample for command <%s>', cmd)
+
+
+if __name__ == '__main__':
+    os.environ.setdefault(_BQ_LOCATION_ENV_VAR, 'europe-west3')
+    os.environ.setdefault(_BQ_TARGET_PROJECT_ID_ENV_VAR, 'tgt-bq')
+    os.environ.setdefault(_GCS_POLICY_BUCKET_ENV_VAR, 'test-list-blobs')
+    os.environ.setdefault(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, 'default-policy.json')
+    os.environ.setdefault(_GCS_REQUEST_BUCKET_ENV_VAR, 'sample-request-831514123984')
+    os.environ.setdefault(_PUBSUB_CMD_TOPIC_ENV_VAR, 'projects/src-bq/topics/bq-sampler-cmd')
+    os.environ.setdefault(_PUBSUB_ERROR_TOPIC_ENV_VAR, 'projects/src-bq/topics/bq-sampler-err')
+    cmd = command.CommandStart(type=command.CommandType.START.value, timestamp=1)
+    process(cmd)

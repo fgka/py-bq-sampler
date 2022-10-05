@@ -29,6 +29,11 @@ def test__fetch_gcs_object_as_json_string_ok(monkeypatch):
 
 def _patch_gcs_storage(monkeypatch):
     monkeypatch.setattr(sampler_bucket.gcs, 'read_object', gcs_on_disk.read_object)
+    monkeypatch.setattr(
+        sampler_bucket.gcs,
+        '_get_gcs_prefixes_http_iterator',
+        gcs_on_disk.get_gcs_prefixes_http_iterator,
+    )
     monkeypatch.setattr(sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names)
 
 

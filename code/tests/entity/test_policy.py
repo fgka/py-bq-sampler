@@ -122,6 +122,7 @@ class TestPolicy:
         assert result.size.percentage is None
         assert result.size.count == 0
 
+
 @pytest.mark.incremental
 class TestTablePolicy:
     def test_ctor_ok(self):

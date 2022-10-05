@@ -33,6 +33,8 @@ def to_command(value: Dict[str, Any], timestamp: int) -> command.CommandBase:
     value[command.CommandBase.timestamp.__name__] = timestamp
     if req_type == command.CommandType.START:
         result = command.CommandStart.from_dict(value)
+    elif req_type == command.CommandType.SAMPLE_POLICY_PREFIX:
+        result = command.CommandSamplePolicyPrefix.from_dict(value)
     elif req_type == command.CommandType.SAMPLE_START:
         result = command.CommandSampleStart.from_dict(value)
     elif req_type == command.CommandType.SAMPLE_DONE:

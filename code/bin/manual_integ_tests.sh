@@ -114,6 +114,7 @@ OPT_NO_DEPLOY="no-deploy"
 OPT_LOGFILE="log"
 OPT_REGION="region"
 OPT_NAME="function"
+OPT_IS_FUNCTION_DEBUG="function-debug-logs"
 OPT_PRJ_ID="prj-id"
 OPT_TARGET_PRJ_ID="tgt-prj-id"
 OPT_SA_EMAIL="sa-email"
@@ -129,6 +130,7 @@ ARGUMENT_FLAG_LIST=(
   "${OPT_HELP}"
   "${OPT_VERBOSE}"
   "${OPT_NO_DEPLOY}"
+  "${OPT_IS_FUNCTION_DEBUG}"
 )
 
 unset ARGUMENT_LIST
@@ -186,7 +188,7 @@ PUBSUB_ERROR_TOPIC="${DEFAULT_SCHEDULER_JOB_NAME}"
 SCHEDULER_JOB_NAME="${DEFAULT_SCHEDULER_JOB_NAME}"
 POLICY_BUCKET_NAME="${DEFAULT_POLICY_BUCKET_NAME}"
 REQUEST_BUCKET_NAME="${DEFAULT_REQUEST_BUCKET_NAME}"
-POLICY_OBJECT_PATH="default-policy.json"
+DEFAULT_POLICY_OBJECT_PATH="default_policy.json"
 SAMPLING_LOCK_OBJECT_PATH="block-sampling"
 
 LOG_FILE=$(mktemp)
@@ -195,6 +197,7 @@ IS_DEBUG="NO"
 DEBUG_LEVEL="DBG"
 
 DEPLOY="YES"
+IS_FUNCTION_DEBUG="NO"
 
 ###############################################################
 ### TEST_FILES
@@ -371,7 +374,7 @@ function check_utilities {
 function help {
   echo
   echo -e "Usage:"
-  echo -e "\t${0} [-h | --${OPT_HELP}] [--${OPT_VERBOSE}] [--${OPT_NO_DEPLOY}]"
+  echo -e "\t${0} [-h | --${OPT_HELP}] [--${OPT_VERBOSE}] [--${OPT_NO_DEPLOY}] [--${OPT_IS_FUNCTION_DEBUG}]"
   echo -e "\t\t--${OPT_TARGET_PRJ_ID} <TARGET_PROJECT_ID>"
   echo -e "\t\t[--${OPT_LOGFILE} <LOG_FILE>]"
   echo -e "\t\t[--${OPT_REGION} <REGION>]"
@@ -387,6 +390,7 @@ function help {
   echo -e "\t-h | --${OPT_HELP} this help"
   echo -e "\t--${OPT_VERBOSE} set log level to DEBUG"
   echo -e "\t--${OPT_NO_DEPLOY} skip CloudFunction deploy step"
+  echo -e "\t--${OPT_IS_FUNCTION_DEBUG} set CloudFunction log level to DEBUG"
   echo -e "\t--${OPT_LOGFILE} with <LOG_FILE> being where the logs will be saved"
   echo -e "\t--${OPT_REGION} with <REGION> overwriting the default region, which is '${DEFAULT_REGION}'"
   echo -e "\t--${OPT_PRJ_ID} with <PROJECT_ID> overwriting the default, which is the current authenticated project ID"
@@ -468,6 +472,7 @@ function clear_bucket {
     log_error "No bucket given for clean up"
     exit 1
   fi
+  local HAS_OBJECTS=$()
   log_info "Cleaning up bucket ${BUCKET}"
   exec_cmd "gsutil rm -r gs://${BUCKET}/** || echo \"Error. Ignoring.\""
 }
@@ -717,6 +722,11 @@ function _big_query_query_replace {
 
 function deploy_function {
   log_info "Deploying function ${FUNCTION_NAME}"
+  local LOG_LEVEL="INFO"
+  if [ ${IS_FUNCTION_DEBUG} == "YES" ]
+  then
+    LOG_LEVEL="DEBUG"
+  fi
   local -a ENV_VARS
   ENV_VARS+=("BQ_LOCATION=${LOCATION}")
   ENV_VARS+=("TARGET_PROJECT_ID=${TARGET_PROJECT_ID}")
@@ -726,7 +736,7 @@ function deploy_function {
   ENV_VARS+=("SAMPLING_LOCK_OBJECT_PATH=${SAMPLING_LOCK_OBJECT_PATH}")
   ENV_VARS+=("CMD_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_CMD_TOPIC}")
   ENV_VARS+=("ERROR_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_ERROR_TOPIC}")
-  ENV_VARS+=("LOG_LEVEL=INFO")
+  ENV_VARS+=("LOG_LEVEL=${LOG_LEVEL}")
   local ENV_VARS_COMMA=$(
     local IFS=","
     echo "${ENV_VARS[*]}"
@@ -779,7 +789,7 @@ function clean_up {
   clear_bucket "${REQUEST_BUCKET_NAME}"
   clear_big_query "${TARGET_PROJECT_ID}"
   log_info "Adding general policy"
-  upload_file "${POLICY_BUCKET_NAME}" "${POLICY_OBJECT_PATH}" "${POLICY_DEFAULT}"
+  upload_file "${POLICY_BUCKET_NAME}" "${DEFAULT_POLICY_OBJECT_PATH}" "${POLICY_DEFAULT}"
   trigger_function
   show_content
   log_info "###############################################################"
@@ -1035,6 +1045,7 @@ function main {
   if [ "${DEPLOY}" == "YES" ]; then
     deploy_function
   fi
+  read -n 1 -p "To start tests, press <ENTER>:" TO_IGNORE
   clean_up
   # run tests
   first_empty_policy
@@ -1075,6 +1086,10 @@ while [[ ${#} -gt 0 ]]; do
     ;;
   --${OPT_NO_DEPLOY})
     DEPLOY="NO"
+    shift 1
+    ;;
+  --${OPT_IS_FUNCTION_DEBUG})
+    IS_FUNCTION_DEBUG="YES"
     shift 1
     ;;
     ## Options with arguments

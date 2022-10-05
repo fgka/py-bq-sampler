@@ -70,6 +70,24 @@ variable "sampling_lock_object_path" {
 // Sampler Function //
 //////////////////////
 
+variable "sampler_function_max_instances" {
+  description = "The maximum amount of concurrent instances for processing sampling commands."
+  type        = number
+  default     = 1000
+}
+
+variable "sampler_function_memory" {
+  description = "The memory allocation for function in MB."
+  type        = number
+  default     = 512
+}
+
+variable "sampler_function_timeout" {
+  description = "The sampler function timeout in seconds."
+  type        = number
+  default     = 540
+}
+
 variable "sampler_function_name" {
   description = "Name of the sampler Cloud Function."
   type        = string
@@ -97,6 +115,12 @@ variable "sampler_service_account_name" {
 ///////////////////////////
 // Notification Function //
 ///////////////////////////
+
+variable "notification_function_max_instances" {
+  description = "The maximum amount of concurrent instances for notification."
+  type        = number
+  default     = 10
+}
 
 variable "notification_function_type" {
   description = "Which kind of notification to use, either SMTP or SENDGRID."

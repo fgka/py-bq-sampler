@@ -95,9 +95,9 @@ module "sampler" {
   function_config = {
     entry_point = var.sampler_function_handler
     runtime     = var.function_runtime
-    instances   = 1
-    memory      = 256
-    timeout     = 180
+    instances   = var.sampler_function_max_instances
+    memory      = var.sampler_function_memory
+    timeout     = var.sampler_function_timeout
   }
   environment_variables = {
     BQ_LOCATION                = var.region
@@ -132,7 +132,7 @@ module "notification" {
   function_config = {
     entry_point = local.notification_handler
     runtime     = var.function_runtime
-    instances   = 1
+    instances   = var.notification_function_max_instances
     memory      = 256
     timeout     = 180
   }

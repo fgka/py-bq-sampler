@@ -106,13 +106,13 @@ def _read_and_print_default_policy(in_text: io.TextIOWrapper) -> policy_.Policy:
 
 def _read_and_print_policy(name: str, in_text: io.TextIOWrapper) -> policy_.Policy:
     _print_display_separator()
-    result = policy_.Policy.from_json(in_text.read())
+    result = policy_.Policy.from_json(in_text.read(), in_text.name)
     _print_policy_request(f'{name} policy: {in_text.name}', result)
     return result
 
 
 def _read_policy_from_json(in_text: io.TextIOWrapper) -> policy_.Policy:
-    return policy_.Policy.from_json(in_text.read())
+    return policy_.Policy.from_json(in_text.read(), in_text.name)
 
 
 def _print_display_separator() -> None:
@@ -172,7 +172,7 @@ def _read_request_for_policies(
 
 
 def _read_sample_from_json(in_text: io.TextIOWrapper) -> table.Sample:
-    return table.Sample.from_json(in_text.read())
+    return table.Sample.from_json(in_text.read(), in_text.name)
 
 
 def _print_policy_request_pair(policy: policy_.Policy, sample: table.Sample) -> None:
@@ -224,7 +224,7 @@ def sample_request(  # pylint: disable=redefined-outer-name
 
 def _read_and_print_sample_request(in_text: io.TextIOWrapper) -> table.Sample:
     _print_display_separator()
-    result = table.Sample.from_json(in_text.read())
+    result = table.Sample.from_json(in_text.read(), in_text.name)
     _print_policy_request(f'Sample request: {in_text.name}', result)
     return result
 

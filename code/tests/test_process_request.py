@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from bq_sampler import process_request
+from bq_sampler import const, process_request
 from bq_sampler.entity import command, table
 
 from tests.entity import sample_policy_data, command_test_data
@@ -119,12 +119,11 @@ def test__process_start_ok(monkeypatch):
     config = _StubGeneralConfig()
     config.location = 'TEST_LOCATION'
     config.default_policy_path = _GENERAL_POLICY_PATH
-    config.policy_bucket = 'POLICY_BUCKET'
+    config.policy_bucket = gcs_on_disk.POLICY_BUCKET
     config.request_bucket = 'REQUEST_BUCKET'
-    config.target_project_id = 'TARGET_PROJECT_ID'
     config.pubsub_request = 'PUBSUB_REQUEST'
     config.sampling_lock_path = _SAMPLING_LOCK_PATH
-    sample_start_req_lst: List[command.CommandSampleStart] = []
+    sample_policy_prefix_req_lst: List[command.CommandSampleStart] = []
     called_drop = False
     called_publish = False
 
@@ -141,29 +140,35 @@ def test__process_start_ok(monkeypatch):
 
     def mocked_publish(value: Dict[str, Any], topic_path: str) -> str:
         assert topic_path == config.pubsub_request
-        nonlocal sample_start_req_lst
+        nonlocal sample_policy_prefix_req_lst
         nonlocal called_publish
-        sample_start_req_lst.append(command.CommandSampleStart.from_dict(value))
+        sample_policy_prefix_req_lst.append(command.CommandSamplePolicyPrefix.from_dict(value))
         called_publish = True
 
     _mock_general_config(monkeypatch, config)
     monkeypatch.setattr(process_request.sampler_bucket.gcs, 'read_object', gcs_on_disk.read_object)
+    monkeypatch.setattr(
+        process_request.sampler_bucket.gcs,
+        '_get_gcs_prefixes_http_iterator',
+        gcs_on_disk.get_gcs_prefixes_http_iterator,
+    )
     monkeypatch.setattr(
         process_request.sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names
     )
     monkeypatch.setattr(
         process_request.sampler_query, 'drop_all_sample_tables', mocked_drop_all_sample_tables
     )
-    monkeypatch.setattr(process_request.sampler_query, 'row_count', lambda _: 100)
     monkeypatch.setattr(process_request.pubsub, 'publish', mocked_publish)
     # When
     process_request._process_start(cmd)
     # Then
     assert called_drop
     assert called_publish
-    assert len(sample_start_req_lst) == 7
-    for start_req in sample_start_req_lst:
-        assert start_req.target_table.project_id == config.target_project_id
+    assert len(sample_policy_prefix_req_lst) == 3
+    for start_prefix_req in sample_policy_prefix_req_lst:
+        assert isinstance(start_prefix_req.prefix, str) and start_prefix_req.prefix.endswith(
+            const.GS_PREFIX_DELIM
+        )
 
 
 def test__process_start_nok_sampling_lock_exists(monkeypatch):
@@ -175,7 +180,9 @@ def test__process_start_nok_sampling_lock_exists(monkeypatch):
     config.sampling_lock_path = _SAMPLING_LOCK_PATH
     called = False
 
-    def mocked_read_object(bucket_name: str, path: str) -> bytes:
+    def mocked_read_object(
+        bucket_name: str, path: str, warn_read_failure: Optional[bool] = True
+    ) -> bytes:
         nonlocal called
         assert bucket_name == config.request_bucket
         assert path == config.sampling_lock_path
@@ -209,6 +216,45 @@ def test__create_sample_done_request_ok():
     assert result.start_timestamp == start_timestamp
     assert result.end_timestamp == end_timestamp
     assert result.error_message == error_message
+
+
+def test__process_sample_policy_prefix_ok(monkeypatch):
+    # Given
+    cmd = command_test_data.TEST_COMMAND_SAMPLE_POLICY_PREFIX
+    config = _StubGeneralConfig()
+    config.pubsub_request = 'PUBSUB_REQUEST'
+    config.target_project_id = 'TARGET_PROJECT_ID'
+    config.policy_bucket = gcs_on_disk.POLICY_BUCKET
+    called = {}
+    _mock_general_config(monkeypatch, config)
+    monkeypatch.setattr(process_request.sampler_bucket.gcs, 'read_object', gcs_on_disk.read_object)
+    monkeypatch.setattr(
+        process_request.sampler_bucket.gcs,
+        '_get_gcs_prefixes_http_iterator',
+        gcs_on_disk.get_gcs_prefixes_http_iterator,
+    )
+    monkeypatch.setattr(
+        process_request.sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names
+    )
+    monkeypatch.setattr(process_request.sampler_query, 'row_count', lambda _: 100)
+    _mock_publish_sample_start(monkeypatch, called, 'called_publish', config.pubsub_request)
+    # When
+    process_request._process_sample_policy_prefix(cmd)
+    # Then
+    assert called.get('called_publish')
+
+
+def _mock_publish_sample_start(
+    monkeypatch, called: Dict[str, bool], called_key: str, topic: str
+) -> None:
+    def mocked_publish(value: Dict[str, Any], topic_path: str) -> str:
+        nonlocal called
+        assert topic_path == topic
+        value_event = command.CommandSampleStart.from_dict(value)
+        assert value_event.type == command.CommandType.SAMPLE_START.value
+        called[called_key] = True
+
+    monkeypatch.setattr(process_request.pubsub, 'publish', mocked_publish)
 
 
 def test__process_sample_start_ok_random(monkeypatch):

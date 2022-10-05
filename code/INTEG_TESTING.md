@@ -2,6 +2,18 @@
 
 Requires environment variables defined in [infrastructure](INFRASTRUCTURE.md).
 
+## Authenticate
+
+```bash
+gcloud auth application-default login
+```
+
+### Set default project
+
+```bash
+gcloud init
+```
+
 ## Importing test data
 
 We use 2 publicly available datasets, namely:

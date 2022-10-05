@@ -16,6 +16,7 @@ from tests.entity import command_test_data
     'value',
     [
         command_test_data.TEST_COMMAND_START,
+        command_test_data.TEST_COMMAND_SAMPLE_POLICY_PREFIX,
         command_test_data.TEST_COMMAND_SAMPLE_START,
         command_test_data.TEST_COMMAND_SAMPLE_DONE,
     ],

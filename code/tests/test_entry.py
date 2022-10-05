@@ -23,7 +23,7 @@ def test__from_pubsub_to_cmd_ok():
     # Given
     cmd = command_test_data.TEST_COMMAND_START
     timestamp = 123
-    zulu_timestamp = datetime.utcfromtimestamp(timestamp).isoformat().replace('+00:00', 'Z')
+    zulu_timestamp = datetime.utcfromtimestamp(timestamp).isoformat().replace('+00:00', '.35Z')
     context = _StubContext(timestamp=zulu_timestamp)
     event = _create_event_str(cmd.as_dict())
     # When

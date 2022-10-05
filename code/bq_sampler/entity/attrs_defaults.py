@@ -10,7 +10,7 @@ Default values for creating an attributes class. To be used as::
 import enum
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import attrs
 
@@ -233,21 +233,26 @@ class HasFromJsonString(HasFromDict):
     """
 
     @classmethod
-    def from_json(cls, json_string: str) -> Any:
+    def from_json(cls, json_string: str, context: Optional[str] = None) -> Any:
         """
         Will parse `json_string` and use :py:meth:`from_dict` to get the instance.
 
         :param json_string:
+        :param context: to add a reference when reporting error.
         :return:
         """
         value = {}
         try:
             value = json.loads(json_string)
         except Exception as err:  # pylint: disable=broad-except
+            error_context = ''
+            if context:
+                error_context = f'. Context: {context}'
             _LOGGER.warning(
-                'Could not parse JSON string <%s> for type <%s>. Ignoring. Error: %s',
+                'Could not parse JSON string <%s> for type <%s>%s. Ignoring. Error: %s',
                 json_string,
                 cls.__name__,
+                error_context,
                 err,
             )
         return cls.from_dict(value)

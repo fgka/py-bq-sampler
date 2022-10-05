@@ -12,6 +12,7 @@ from typing import Any, Dict, Union
 import cachetools
 
 from google.cloud import pubsub_v1
+from google.cloud.pubsub_v1 import types
 
 from bq_sampler import logger
 
@@ -82,4 +83,9 @@ def publish(value: Dict[str, Any], topic_path: str) -> None:
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
 def _client() -> pubsub_v1.PublisherClient:
-    return pubsub_v1.PublisherClient()
+    flow_control = types.PublishFlowControl(
+        limit_exceeded_behavior=types.LimitExceededBehavior.BLOCK
+    )
+    return pubsub_v1.PublisherClient(
+        publisher_options=types.PublisherOptions(flow_control=flow_control)
+    )
