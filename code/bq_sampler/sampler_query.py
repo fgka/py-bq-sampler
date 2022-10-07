@@ -283,7 +283,7 @@ def create_table_with_random_sample(
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
-) -> None:
+) -> int:
     """
     Will create the target table and put the source table sample directly into it.
     See :py:func:`random_sample` for details in the sampling strategy.
@@ -294,13 +294,13 @@ def create_table_with_random_sample(
     :param labels:
     :param recreate_table: if :py:obj:`True` (default) will drop the table prior to create it.
         If the table does not exist, it will ignore the drop.
-    :return:
+    :return: amount of rows inserted
     """
     # validate input
     _validate_table_to_table_sample(source_table_ref, target_table_ref)
     _validate_amount(amount)
     # logic
-    _create_table_with_random_sample(
+    return _create_table_with_random_sample(
         source_table_ref,
         target_table_ref,
         amount,
@@ -328,24 +328,35 @@ def _create_table_with_random_sample(
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
-) -> None:
+) -> int:
+    result = 0
     # create table
     _create_table(
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
     )
     # insert data
     percent_int = _int_percent_for_tablesample_stmt(source_table_ref.table_fqn_id(), amount)
-    query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
-        source_table_fqn_id=source_table_ref.table_fqn_id(False),
-        target_table_fqn_id=target_table_ref.table_fqn_id(False),
-        amount=amount,
-        percent_int=percent_int,
-    )
-    bq.query_job_result(
-        query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
-        project_id=target_table_ref.project_id,
-        location=target_table_ref.location,
-    )
+    if amount <= 0 or percent_int <= 0:
+        _LOGGER.warning(
+            'Ignoring random sample request for table <%s> because either the amount <%s> or percentual <%s> are zero',
+            source_table_ref.table_fqn_id(False),
+            amount,
+            percent_int,
+        )
+    else:
+        query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
+            source_table_fqn_id=source_table_ref.table_fqn_id(False),
+            target_table_fqn_id=target_table_ref.table_fqn_id(False),
+            amount=amount,
+            percent_int=percent_int,
+        )
+        row_iter = bq.query_job_result(
+            query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
+            project_id=target_table_ref.project_id,
+            location=target_table_ref.location,
+        )
+        result = row_iter.total_rows
+    return result
 
 
 def _create_table(
@@ -372,7 +383,7 @@ def create_table_with_sorted_sample(
     order: str,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
-) -> None:
+) -> int:
     """
     Will create the target table and put the source table sample directly into it.
     See :py:func:`sorted_sample` for details in the sampling strategy.
@@ -384,7 +395,7 @@ def create_table_with_sorted_sample(
     :param order:
     :param labels:
     :param recreate_table:
-    :return:
+    :return: amount of rows inserted
     """
     # validate input
     _validate_table_to_table_sample(source_table_ref, target_table_ref)
@@ -392,7 +403,7 @@ def create_table_with_sorted_sample(
     (column,) = _validate_str_args(column)
     order = _validate_order(order)
     # logic
-    _create_table_with_sorted_sample(
+    return _create_table_with_sorted_sample(
         source_table_ref,
         target_table_ref,
         amount,
@@ -411,21 +422,31 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     order: str,
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
-) -> None:
+) -> int:
+    result = 0
     # create table
     _create_table(
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
     )
     # insert data
-    query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
-        source_table_fqn_id=source_table_ref.table_fqn_id(False),
-        target_table_fqn_id=target_table_ref.table_fqn_id(False),
-        amount=amount,
-        column=column,
-        order=order,
-    )
-    bq.query_job_result(
-        query=_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
-        project_id=target_table_ref.project_id,
-        location=target_table_ref.location,
-    )
+    if amount <= 0:
+        _LOGGER.warning(
+            'Ignoring sorted sample request for table <%s> because either the amount <%s> is zero',
+            source_table_ref.table_fqn_id(False),
+            amount,
+        )
+    else:
+        query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
+            source_table_fqn_id=source_table_ref.table_fqn_id(False),
+            target_table_fqn_id=target_table_ref.table_fqn_id(False),
+            amount=amount,
+            column=column,
+            order=order,
+        )
+        row_iter = bq.query_job_result(
+            query=_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
+            project_id=target_table_ref.project_id,
+            location=target_table_ref.location,
+        )
+        result = row_iter.total_rows
+    return result
