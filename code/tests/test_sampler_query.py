@@ -49,7 +49,12 @@ def test_random_sample_ok(monkeypatch):
     assert result == _DEFAULT_MOCKED_QUERY_JOB_RESULT
 
 
-_DEFAULT_MOCKED_QUERY_JOB_RESULT: str = "MOCKED_QUERY_JOB_RESULT"
+class StubbedRowIterator:
+    def __init__(self, amount: int):
+        self.total_rows = amount
+
+
+_DEFAULT_MOCKED_QUERY_JOB_RESULT: StubbedRowIterator = StubbedRowIterator(0)
 _DEFAULT_MOCKED_ROW_COUNT: int = 1000
 
 _COMMON_QUERY_SUB_STRINGS: List[str] = ['SELECT * FROM `', 'LIMIT ']
@@ -252,14 +257,40 @@ def test__int_percent_for_tablesample_stmt_ok_empty_table(monkeypatch):
 
 def test_create_table_with_random_sample_ok(monkeypatch):
     # Given
+    amount = _TEST_SAMPLE_AMOUNT
     query_validation_fn = _query_validation_fn(is_random_query=True, has_insert=True)
-    _mock_calls_bq(monkeypatch, query_validation_fn=query_validation_fn)
-    # When/Then
-    sampler_query.create_table_with_random_sample(
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_random_sample(
         source_table_ref=_TEST_SOURCE_TABLE_REF,
         target_table_ref=_TEST_TARGET_TABLE_REF,
-        amount=_TEST_SAMPLE_AMOUNT,
+        amount=amount,
     )
+    # Then
+    assert result == amount
+
+
+def test_create_table_with_random_sample_ok_0_amount(monkeypatch):
+    # Given
+    amount = 0
+    query_validation_fn = _query_validation_fn(is_random_query=True, has_insert=True)
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_random_sample(
+        source_table_ref=_TEST_SOURCE_TABLE_REF,
+        target_table_ref=_TEST_TARGET_TABLE_REF,
+        amount=amount,
+    )
+    # Then
+    assert result == amount
 
 
 @pytest.mark.parametrize(
@@ -293,16 +324,23 @@ def test_create_table_with_random_sample_nok(
 
 def test_create_table_with_sorted_sample_ok(monkeypatch):
     # Given
+    amount = _TEST_SAMPLE_AMOUNT
     query_validation_fn = _query_validation_fn(is_random_query=False, has_insert=True)
-    _mock_calls_bq(monkeypatch, query_validation_fn=query_validation_fn)
-    # When/Then
-    sampler_query.create_table_with_sorted_sample(
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_sorted_sample(
         source_table_ref=_TEST_SOURCE_TABLE_REF,
         target_table_ref=_TEST_TARGET_TABLE_REF,
-        amount=_TEST_SAMPLE_AMOUNT,
+        amount=amount,
         column=_TEST_SORT_COLUMN_NAME,
         order=_TEST_SORT_ORDER,
     )
+    # Then
+    assert result == amount
 
 
 @pytest.mark.parametrize(
