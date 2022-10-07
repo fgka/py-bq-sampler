@@ -92,7 +92,9 @@ def policy(  # pylint: disable=redefined-outer-name
             pathlib.Path(request_dir), pathlib.Path(policy_dir)
         ):
             actual_pol = _patch_and_print_policy(pol, default_policy)
+            # pylint: disable=protected-access
             actual_req = process_request._compliant_sample_request(actual_pol, req)
+            # pylint: enable=protected-access
             _print_policy_request_pair(actual_pol, actual_req)
     else:
         for pol_text in policy:
@@ -136,17 +138,18 @@ def _patch_and_print_policy(policy_a: policy_.Policy, policy_b: policy_.Policy) 
 
 
 def _list_dir(value: pathlib.Path) -> Generator[io.TextIOWrapper, None, None]:
-    for f in _list_files_in_dir(value):
-        yield open(f, "r", encoding="UTF-8")
+    for in_file_name in _list_files_in_dir(value):
+        with open(in_file_name, "r", encoding="UTF-8") as in_file:
+            yield in_file
 
 
 def _list_files_in_dir(value: pathlib.Path) -> Generator[pathlib.Path, None, None]:
     for root, dirs, files in os.walk(value.absolute()):
         r_path = pathlib.Path(root)
-        for f in files:
-            yield r_path / f
-        for d in dirs:
-            val = r_path / d
+        for f_name in files:
+            yield r_path / f_name
+        for d_name in dirs:
+            val = r_path / d_name
             for res in _list_files_in_dir(val):
                 yield res
 
@@ -168,16 +171,16 @@ def _read_request_for_policies(
                 req_policy = _read_policy_from_json(in_json)
             yield req_policy, req_sample
         except ValueError as err:
-            print(f"There is no policy for request {req}. Ignoring.")
+            print(f"There is no policy for request {req}. Ignoring. Error: {err}")
 
 
 def _read_sample_from_json(in_text: io.TextIOWrapper) -> table.Sample:
     return table.Sample.from_json(in_text.read(), in_text.name)
 
 
-def _print_policy_request_pair(policy: policy_.Policy, sample: table.Sample) -> None:
+def _print_policy_request_pair(value: policy_.Policy, sample: table.Sample) -> None:
     _print_display_separator()
-    _print_policy_request("Specific policy", policy)
+    _print_policy_request("Specific policy", value)
     _print_policy_request("Specific request", sample)
 
 
