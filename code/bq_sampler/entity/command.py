@@ -82,3 +82,6 @@ class CommandSampleDone(CommandSampleStart):  # pylint: disable=too-few-public-m
     start_timestamp: int = attrs.field(validator=attrs.validators.gt(0))
     end_timestamp: int = attrs.field(validator=attrs.validators.gt(0))
     error_message: str = attrs.field(default='', validator=attrs.validators.instance_of(str))
+    amount_inserted: int = attrs.field(
+        default=None, validator=attrs.validators.optional(attrs.validators.ge(0))
+    )
