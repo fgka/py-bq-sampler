@@ -4,6 +4,7 @@ Processes a request coming from Cloud Function.
 """
 import os
 import time
+from typing import Optional
 
 import cachetools
 
@@ -271,8 +272,9 @@ def _process_sample_start(cmd: command.CommandSampleStart) -> None:
         amount=cmd.sample_request.sample.size.count,
         recreate_table=True,
     )
+    amount_inserted = 0
     if sample_type == table.SortType.RANDOM:
-        sampler_query.create_table_with_random_sample(**kwargs)
+        amount_inserted = sampler_query.create_table_with_random_sample(**kwargs)
     elif sample_type == table.SortType.SORTED:
         kwargs.update(
             dict(
@@ -280,11 +282,15 @@ def _process_sample_start(cmd: command.CommandSampleStart) -> None:
                 order=cmd.sample_request.sample.spec.properties.direction,
             )
         )
-        sampler_query.create_table_with_sorted_sample(**kwargs)  # pylint: disable=missing-kwoa
+        amount_inserted = sampler_query.create_table_with_sorted_sample(
+            **kwargs
+        )  # pylint: disable=missing-kwoa
     else:
         raise ValueError(f'Cannot process sample request of type <{sample_type}> in <{cmd}>')
     end_timestamp = int(time.time())
-    sample_done = _create_sample_done_cmd(cmd, start_timestamp, end_timestamp, error_message)
+    sample_done = _create_sample_done_cmd(
+        cmd, start_timestamp, end_timestamp, error_message, amount_inserted
+    )
     pubsub.publish(sample_done.as_dict(), _general_config().pubsub_request)
 
 
@@ -293,6 +299,7 @@ def _create_sample_done_cmd(
     start_timestamp: int,
     end_timestamp: int,
     error_message: str,
+    amount_inserted: Optional[int] = None,
 ) -> command.CommandSampleDone:
     kwargs = {
         command.CommandSampleDone.type.__name__: command.CommandType.SAMPLE_DONE.value,
@@ -302,6 +309,7 @@ def _create_sample_done_cmd(
         command.CommandSampleDone.start_timestamp.__name__: start_timestamp,
         command.CommandSampleDone.end_timestamp.__name__: end_timestamp,
         command.CommandSampleDone.error_message.__name__: error_message,
+        command.CommandSampleDone.amount_inserted.__name__: amount_inserted,
     }
     return command.CommandSampleDone(**kwargs)
 

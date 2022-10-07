@@ -350,12 +350,12 @@ def _create_table_with_random_sample(
             amount=amount,
             percent_int=percent_int,
         )
-        row_iter = bq.query_job_result(
+        bq.query_job_result(
             query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
             project_id=target_table_ref.project_id,
             location=target_table_ref.location,
         )
-        result = row_iter.total_rows
+        result = row_count(target_table_ref)
     return result
 
 
@@ -423,7 +423,6 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
-    result = 0
     # create table
     _create_table(
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
@@ -443,10 +442,9 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
             column=column,
             order=order,
         )
-        row_iter = bq.query_job_result(
+        bq.query_job_result(
             query=_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
             project_id=target_table_ref.project_id,
             location=target_table_ref.location,
         )
-        result = row_iter.total_rows
-    return result
+    return row_count(target_table_ref)
