@@ -65,8 +65,8 @@ def read_object(bucket_name: str, path: str, warn_read_failure: Optional[bool] =
     gcs_uri = f'gs://{bucket_name}/{path}'
     _LOGGER.debug('Reading <%s>', gcs_uri)
     try:
-        bucket = _bucket(bucket_name)
-        blob = bucket.get_blob(path)
+        bucket_obj = _bucket(bucket_name)
+        blob = bucket_obj.get_blob(path)
         if blob is not None:
             result = blob.download_as_bytes()
             _LOGGER.debug('Read <%s>', gcs_uri)
@@ -99,6 +99,7 @@ def list_prefixes(
     prefix: Optional[str] = None,
     filter_fn: Optional[Callable[[str], bool]] = None,
 ) -> Generator[str, None, None]:
+    # pylint: disable=line-too-long
     """
     Source: https://stackoverflow.com/questions/37074977/how-to-get-list-of-folders-in-a-given-bucket-using-google-cloud-api/59008580#59008580
 
@@ -136,6 +137,7 @@ def list_prefixes(
     :param filter_fn:
     :return:
     """
+    # pylint: enable=line-too-long
     # validate
     prefix = _get_list_prefixes_root_prefix(prefix)
     _LOGGER.info("Listing prefixes from gs://%s/%s", bucket_name, prefix)
@@ -185,7 +187,7 @@ def _get_gcs_prefixes_http_iterator(bucket_name: str, prefix: str) -> page_itera
     client = _client()
     return page_iterator.HTTPIterator(
         client=client,
-        api_request=client._connection.api_request,
+        api_request=client._connection.api_request,  # pylint: disable=protected-access
         path=_gcs_http_iterator_bucket_path(bucket_name),
         items_key=_GCS_PAGE_ITERATOR_PREFIXES_ITEMS_KEY,
         item_to_value=_list_prefixes_item_to_value,
@@ -197,8 +199,12 @@ def _gcs_http_iterator_bucket_path(bucket_name: str) -> str:
     return f"/b/{bucket_name}/o"
 
 
+# pylint: disable=unused-argument
 def _list_prefixes_item_to_value(iterator: page_iterator.HTTPIterator, item: Any) -> str:
     return item
+
+
+# pylint: enable=unused-argument
 
 
 def _list_prefixes_extra_params(prefix: str) -> Dict[str, Any]:
@@ -268,10 +274,3 @@ def list_objects(
 def _list_blob_names(bucket_name: str, prefix: Optional[str] = None) -> Generator[str, None, None]:
     for blob in _client().list_blobs(bucket_name, prefix=prefix):
         yield blob.name
-
-
-if __name__ == '__main__':
-    bucket = "test-list-blobs"
-    entries = list(list_prefixes(bucket))
-    for x in entries:
-        print(x)

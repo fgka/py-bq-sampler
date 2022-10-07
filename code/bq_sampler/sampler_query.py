@@ -329,7 +329,6 @@ def _create_table_with_random_sample(
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
-    result = 0
     # create table
     _create_table(
         source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
@@ -338,7 +337,8 @@ def _create_table_with_random_sample(
     percent_int = _int_percent_for_tablesample_stmt(source_table_ref.table_fqn_id(), amount)
     if amount <= 0 or percent_int <= 0:
         _LOGGER.warning(
-            'Ignoring random sample request for table <%s> because either the amount <%s> or percentual <%s> are zero',
+            'Ignoring random sample request for table <%s> '
+            'because either the amount <%s> or percentual <%s> are zero',
             source_table_ref.table_fqn_id(False),
             amount,
             percent_int,
@@ -355,8 +355,7 @@ def _create_table_with_random_sample(
             project_id=target_table_ref.project_id,
             location=target_table_ref.location,
         )
-        result = row_count(target_table_ref)
-    return result
+    return row_count(target_table_ref)
 
 
 def _create_table(

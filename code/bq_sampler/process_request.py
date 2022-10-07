@@ -80,40 +80,40 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         return self._sampling_lock_path
 
 
-def process(cmd: command.CommandBase) -> None:
+def process(value: command.CommandBase) -> None:
     """
     Single entry point to process commands coming from Pub/Sub.
 
-    :param cmd:
+    :param value:
     :return:
     """
-    _LOGGER.info('Processing command <%s>', cmd)
+    _LOGGER.info('Processing command <%s>', value)
     try:
-        _process(cmd)
-        _LOGGER.debug('Processed command <%s>', cmd)
+        _process(value)
+        _LOGGER.debug('Processed command <%s>', value)
     except Exception as err:
         error_data = {
-            _PUBSUB_ERROR_CMD_ENTRY: cmd.as_dict(),
+            _PUBSUB_ERROR_CMD_ENTRY: value.as_dict(),
             _PUBSUB_ERROR_MSG_ENTRY: str(err),
         }
         pubsub.publish(error_data, _general_config().pubsub_error)
-        raise RuntimeError(f'Could not process command: <{cmd}>. Error: {err}') from err
+        raise RuntimeError(f'Could not process command: <{value}>. Error: {err}') from err
 
 
-def _process(cmd: command.CommandBase) -> None:
-    if cmd.type == command.CommandType.START.value:
-        _process_start(cmd)
-    elif cmd.type == command.CommandType.SAMPLE_POLICY_PREFIX.value:
-        _process_sample_policy_prefix(cmd)
-    elif cmd.type == command.CommandType.SAMPLE_START.value:
-        _process_sample_start(cmd)
-    elif cmd.type == command.CommandType.SAMPLE_DONE.value:
-        _process_sample_done(cmd)
+def _process(value: command.CommandBase) -> None:
+    if value.type == command.CommandType.START.value:
+        _process_start(value)
+    elif value.type == command.CommandType.SAMPLE_POLICY_PREFIX.value:
+        _process_sample_policy_prefix(value)
+    elif value.type == command.CommandType.SAMPLE_START.value:
+        _process_sample_start(value)
+    elif value.type == command.CommandType.SAMPLE_DONE.value:
+        _process_sample_done(value)
     else:
-        raise ValueError(f'Command type <{cmd.type}> cannot be processed')
+        raise ValueError(f'Command type <{value.type}> cannot be processed')
 
 
-def _process_start(cmd: command.CommandStart) -> None:
+def _process_start(value: command.CommandStart) -> None:
     """
     Will inspect the policy and requests buckets,
         apply compliance,
@@ -121,7 +121,7 @@ def _process_start(cmd: command.CommandStart) -> None:
     It will also generate a :py:class:`command.CommandSampleStart` for each one'
         and send it out into the Pub/Sub topic.
 
-    :param cmd:
+    :param value:
     :return:
     """
     if sampler_bucket.is_sampling_lock_present(
@@ -134,10 +134,10 @@ def _process_start(cmd: command.CommandStart) -> None:
         raise InterruptedError(
             f'Sampling interrupted by presence of <{gcs_url}>. Remove to re-enable sampling.'
         )
-    _process_start_ok(cmd)
+    _process_start_ok(value)
 
 
-def _process_start_ok(cmd: command.CommandStart) -> None:
+def _process_start_ok(value: command.CommandStart) -> None:
     _LOGGER.debug('Dropping all sample tables in <%s>', _general_config().target_project_id)
     sampler_query.drop_all_sample_tables(
         project_id=_general_config().target_project_id, location=_general_config().location
@@ -151,52 +151,54 @@ def _process_start_ok(cmd: command.CommandStart) -> None:
     ):
         _LOGGER.debug('Sending request for prefix: %s', prefix)
         # create sample for prefix request event
-        sample_policy_prefix_req = _create_sample_policy_prefix_cmd(cmd, prefix)
+        sample_policy_prefix_req = _create_sample_policy_prefix_cmd(value, prefix)
         # send request out
         _publish_cmd_to_pubsub(sample_policy_prefix_req)
 
 
 def _create_sample_policy_prefix_cmd(
-    cmd: command.CommandStart, prefix: str
+    value: command.CommandStart, prefix: str
 ) -> command.CommandSamplePolicyPrefix:
+    # pylint: disable=line-too-long
     kwargs = {
         command.CommandSamplePolicyPrefix.type.__name__: command.CommandType.SAMPLE_POLICY_PREFIX.value,
-        command.CommandSamplePolicyPrefix.timestamp.__name__: cmd.timestamp,
+        command.CommandSamplePolicyPrefix.timestamp.__name__: value.timestamp,
         command.CommandSamplePolicyPrefix.prefix.__name__: prefix,
     }
+    # pylint: enable=line-too-long
     return command.CommandSamplePolicyPrefix(**kwargs)
 
 
-def _process_sample_policy_prefix(cmd: command.CommandSamplePolicyPrefix) -> None:
+def _process_sample_policy_prefix(value: command.CommandSamplePolicyPrefix) -> None:
     """
     Will list all policies in the policy bucket but restricted to the given prefix in `cmd`.
     For each policy will issue the corresponding :py:class:`command.CommandSampleStart`.
 
-    :param cmd:
+    :param value:
     :return:
     """
-    _LOGGER.info('Issuing sample command <%s>', cmd)
-    _process_sample_policy_prefix_ok(cmd)
+    _LOGGER.info('Issuing sample command <%s>', value)
+    _process_sample_policy_prefix_ok(value)
 
 
-def _process_sample_policy_prefix_ok(cmd: command.CommandSamplePolicyPrefix) -> None:
+def _process_sample_policy_prefix_ok(value: command.CommandSamplePolicyPrefix) -> None:
     _LOGGER.debug(
         'Retrieving all policies from bucket <%s> and prefix <%s>',
         _general_config().policy_bucket,
-        cmd.prefix,
+        value.prefix,
     )
     errors = []
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
         default_policy_object_path=_general_config().default_policy_path,
         location=_general_config().location,
-        prefix=cmd.prefix,
+        prefix=value.prefix,
     ):
         _LOGGER.info(
             'Retrieving request, if existent, for table <%s> from bucket <%s> and prefix <%s>',
             table_policy,
             _general_config().request_bucket,
-            cmd.prefix,
+            value.prefix,
         )
         try:
             table_sample = sampler_bucket.sample_request_from_policy(
@@ -206,15 +208,15 @@ def _process_sample_policy_prefix_ok(cmd: command.CommandSamplePolicyPrefix) -> 
             # compliance enforcement
             table_sample = _compliant_sample_request(table_policy, table_sample)
             # create sample request event
-            start_sample_req = _create_sample_start_cmd(cmd, table_policy, table_sample)
+            start_sample_req = _create_sample_start_cmd(value, table_policy, table_sample)
             # send request out
             _publish_cmd_to_pubsub(start_sample_req)
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-except
             msg = f'Ignoring sampling for policy {table_policy} due to error: {err}'
             errors.append(msg)
             _LOGGER.error(msg)
     if errors:
-        raise RuntimeError(f'Failed command {cmd} with error(s): {errors}')
+        raise RuntimeError(f'Failed command {value} with error(s): {errors}')
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=1))
@@ -230,14 +232,14 @@ def _compliant_sample_request(
 
 
 def _create_sample_start_cmd(
-    cmd: command.CommandSamplePolicyPrefix,
+    value: command.CommandSamplePolicyPrefix,
     table_policy: policy.TablePolicy,
     table_sample: table.TableSample,
 ) -> command.CommandSampleStart:
     source_table = table_policy.table_reference
     kwargs = {
         command.CommandSampleStart.type.__name__: command.CommandType.SAMPLE_START.value,
-        command.CommandSampleStart.timestamp.__name__: cmd.timestamp,
+        command.CommandSampleStart.timestamp.__name__: value.timestamp,
         command.CommandSampleStart.sample_request.__name__: table_sample,
         command.CommandSampleStart.target_table.__name__: source_table.clone(
             project_id=_general_config().target_project_id
@@ -246,30 +248,30 @@ def _create_sample_start_cmd(
     return command.CommandSampleStart(**kwargs)
 
 
-def _publish_cmd_to_pubsub(cmd: command.CommandBase) -> None:
+def _publish_cmd_to_pubsub(value: command.CommandBase) -> None:
     topic = _general_config().pubsub_request
-    _LOGGER.debug('Sending event request <%s> to topic <%s>', cmd, topic)
-    data = cmd.as_dict()
+    _LOGGER.debug('Sending event request <%s> to topic <%s>', value, topic)
+    data = value.as_dict()
     pubsub.publish(data, topic)
 
 
-def _process_sample_start(cmd: command.CommandSampleStart) -> None:
+def _process_sample_start(value: command.CommandSampleStart) -> None:
     """
     Given a compliant sample request, issue the BigQuery corresponding sampling request.
     When finished, will push a Pub/Sub message containing the
         :py:class:`command.CommandSampleDone` request.
 
-    :param cmd:
+    :param value:
     :return:
     """
-    _LOGGER.info('Issuing sample command <%s>', cmd)
+    _LOGGER.info('Issuing sample command <%s>', value)
     start_timestamp = int(time.time())
     error_message = ''
-    sample_type = table.SortType.from_str(cmd.sample_request.sample.spec.type)
+    sample_type = table.SortType.from_str(value.sample_request.sample.spec.type)
     kwargs = dict(
-        source_table_ref=cmd.sample_request.table_reference,
-        target_table_ref=cmd.target_table,
-        amount=cmd.sample_request.sample.size.count,
+        source_table_ref=value.sample_request.table_reference,
+        target_table_ref=value.target_table,
+        amount=value.sample_request.sample.size.count,
         recreate_table=True,
     )
     amount_inserted = 0
@@ -278,24 +280,24 @@ def _process_sample_start(cmd: command.CommandSampleStart) -> None:
     elif sample_type == table.SortType.SORTED:
         kwargs.update(
             dict(
-                column=cmd.sample_request.sample.spec.properties.by,
-                order=cmd.sample_request.sample.spec.properties.direction,
+                column=value.sample_request.sample.spec.properties.by,
+                order=value.sample_request.sample.spec.properties.direction,
             )
         )
-        amount_inserted = sampler_query.create_table_with_sorted_sample(
-            **kwargs
-        )  # pylint: disable=missing-kwoa
+        # pylint: disable=missing-kwoa
+        amount_inserted = sampler_query.create_table_with_sorted_sample(**kwargs)
+        # pylint: enable=missing-kwoa
     else:
-        raise ValueError(f'Cannot process sample request of type <{sample_type}> in <{cmd}>')
+        raise ValueError(f'Cannot process sample request of type <{sample_type}> in <{value}>')
     end_timestamp = int(time.time())
     sample_done = _create_sample_done_cmd(
-        cmd, start_timestamp, end_timestamp, error_message, amount_inserted
+        value, start_timestamp, end_timestamp, error_message, amount_inserted
     )
     pubsub.publish(sample_done.as_dict(), _general_config().pubsub_request)
 
 
 def _create_sample_done_cmd(
-    cmd: command.CommandSampleStart,
+    value: command.CommandSampleStart,
     start_timestamp: int,
     end_timestamp: int,
     error_message: str,
@@ -303,9 +305,9 @@ def _create_sample_done_cmd(
 ) -> command.CommandSampleDone:
     kwargs = {
         command.CommandSampleDone.type.__name__: command.CommandType.SAMPLE_DONE.value,
-        command.CommandSampleDone.timestamp.__name__: cmd.timestamp,
-        command.CommandSampleDone.sample_request.__name__: cmd.sample_request,
-        command.CommandSampleDone.target_table.__name__: cmd.target_table,
+        command.CommandSampleDone.timestamp.__name__: value.timestamp,
+        command.CommandSampleDone.sample_request.__name__: value.sample_request,
+        command.CommandSampleDone.target_table.__name__: value.target_table,
         command.CommandSampleDone.start_timestamp.__name__: start_timestamp,
         command.CommandSampleDone.end_timestamp.__name__: end_timestamp,
         command.CommandSampleDone.error_message.__name__: error_message,
@@ -314,15 +316,15 @@ def _create_sample_done_cmd(
     return command.CommandSampleDone(**kwargs)
 
 
-def _process_sample_done(cmd: command.CommandSampleDone) -> None:
+def _process_sample_done(value: command.CommandSampleDone) -> None:
     """
     Collect the signal that a given sampling request has finished, logging it.
     If there is any error message, pushes the message into the error Pub/Sub topic.
 
-    :param cmd:
+    :param value:
     :return:
     """
-    _LOGGER.info('Completed sample for command <%s>', cmd)
+    _LOGGER.info('Completed sample for command <%s>', value)
 
 
 if __name__ == '__main__':
