@@ -9,6 +9,8 @@ from datetime import datetime
 import json
 from typing import Any
 
+import pytest
+
 from bq_sampler import entry
 
 from tests.entity import command_test_data
@@ -37,3 +39,18 @@ def test__from_pubsub_to_cmd_ok():
 def _create_event_str(data: Any) -> str:
     data_str = base64.b64encode(bytes(json.dumps(data).encode('utf-8')))
     return dict(data=data_str)
+
+
+@pytest.mark.parametrize(
+    'value,expected',
+    [
+        ('2022-10-07T11:01:38', 1665140498),
+        ('2022-10-07T11:01:38Z', 1665140498),
+        ('2022-10-07T11:01:38.123Z', 1665140498),
+    ],
+)
+def test__extract_timestamp_from_iso_str_ok(value: str, expected: int):
+    # Given/When
+    result = entry._extract_timestamp_from_iso_str(value)
+    # Then
+    assert result == expected

@@ -65,15 +65,18 @@ def _handler(
 
 def _from_pubsub_to_cmd(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     cmd_dict = pubsub.parse_json_data(event.get('data'))
+    timestamp = _extract_timestamp_from_iso_str(context.timestamp)
+    return command_parser.to_command(cmd_dict, timestamp)
+
+
+def _extract_timestamp_from_iso_str(value: str) -> int:
     # Zulu timezone = UTC
     # https://en.wikipedia.org/wiki/List_of_military_time_zones
-    iso_zulu_datetime = context.timestamp
-    plain_iso_dateime = re.sub(r'\.[0-9]*Z', '+00:00', iso_zulu_datetime)
+    plain_iso_dateime = re.sub(r'(\.[0-9]\+)?Z', '+00:00', value)
     try:
-        timestamp: int = calendar.timegm(datetime.fromisoformat(plain_iso_dateime).utctimetuple())
+        result: int = calendar.timegm(datetime.fromisoformat(plain_iso_dateime).utctimetuple())
     except Exception as err:
         raise RuntimeError(
-            f'Could not extract timestamp from <{context.timestamp}>({type(context.timestamp)}).'
-            f' Error: {err}'
+            f'Could not extract timestamp from <{value}>({type(value)}).' f' Error: {err}'
         ) from err
-    return command_parser.to_command(cmd_dict, timestamp)
+    return result
