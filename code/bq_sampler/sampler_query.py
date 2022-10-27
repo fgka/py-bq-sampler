@@ -496,7 +496,6 @@ def _sample_query_execution(
             target_table_ref=target_table_ref,
             notification_pubsub_topic=notification_pubsub_topic,
             bq_transfer_sa=bq_transfer_sa,
-            drop_source_table=True,
         )
 
 
@@ -506,7 +505,6 @@ def _transfer_content_x_location(
     target_table_ref: table.TableReference,
     notification_pubsub_topic: Optional[str] = None,
     bq_transfer_sa: Optional[str] = None,
-    drop_source_table: Optional[bool] = True,
 ) -> None:
     if source_table_ref.location != target_table_ref.location:
         # A transfer needs to happen
@@ -516,8 +514,6 @@ def _transfer_content_x_location(
             notification_pubsub_topic=notification_pubsub_topic,
             bq_transfer_sa=bq_transfer_sa,
         )
-        if drop_source_table:
-            bq.drop_table(table_fqn_id=source_table_ref.table_fqn_id(), not_found_ok=True)
 
 
 def create_table_with_sorted_sample(
