@@ -11,8 +11,6 @@ import base64
 import os
 from typing import Any, Callable, Dict, Optional, Union
 
-import flask
-
 # From: https://cloud.google.com/logging/docs/setup/python
 import google.cloud.logging
 
@@ -35,7 +33,9 @@ from bq_sampler import logger  # pylint: disable=wrong-import-position
 _LOGGER = logger.get(__name__)
 
 
-def handler(event: Optional[Union[flask.Request, Dict[str, Any]]] = None, context: Optional[Any] = None) -> None:
+def handler(
+    event: Optional[Union[flask.Request, Dict[str, Any]]] = None, context: Optional[Any] = None
+) -> str:
     """
     Entry-point for GCP CloudFunction.
     This is just a proxy to keep the code organized in a pythonic way.
@@ -52,29 +52,28 @@ def handler(event: Optional[Union[flask.Request, Dict[str, Any]]] = None, contex
         `type.googleapis.com/google.pubsub.v1.PubsubMessage`.
     :return:
     """
-    _handler(entry.handler, event, context)
+    return _handler(entry.handler, event, context)
 
 
 def _handler(
     handler_fn: Callable[[Dict[str, Any], Any], None] = None,
     event: Optional[Union[flask.Request, Dict[str, Any]]] = None,
     context: Optional[Any] = None,
-) -> None:
+) -> str:
     _LOGGER.debug(
         'Processing event <%s> and context <%s>. Environment: %s', event, context, str(os.environ)
     )
     try:
         if isinstance(event, flask.Request):
-            _LOGGER.debug(f'Event is of type {type(event)}. Extracting JSON payload.')
+            _LOGGER.debug('Event is of type %s. Extracting JSON payload.', type(event))
             event = event.get_json()
-        handler_fn(event, context)
+        result = handler_fn(event, context)
         _LOGGER.debug(
             'Finished processing event <%s> and context <%s>. Environment: %s',
             event,
             context,
             str(os.environ),
         )
-        flask.jsonify(success=True)
     except Exception as err:  # pylint: disable=broad-except
         msg = (
             f'Could not process event: <{event}>({type(event)}),'
@@ -83,10 +82,11 @@ def _handler(
             f' Error: {err}'
         )
         _LOGGER.critical(msg)
-        flask.abort(500, {'message': msg})
+        raise RuntimeError(msg) from err
+    return result
 
 
-def handler_sendgrid(event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> None:
+def handler_sendgrid(event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> str:
     """
     Triggered from a message on a Pub/Sub topic to send through Sendgrid.
 
@@ -94,16 +94,16 @@ def handler_sendgrid(event: Optional[Dict[str, Any]] = None, context: Optional[A
     :param context: Metadata for the event.
     :return:
     """
-    _handler(_sendgrid_handler_fn, event, context)
+    return _handler(_sendgrid_handler_fn, event, context)
 
 
-def _sendgrid_handler_fn(event: Optional[Dict[str, Any]] = None, _: Any = None) -> None:
-    email.email_handler(
+def _sendgrid_handler_fn(event: Optional[Dict[str, Any]] = None, _: Any = None) -> str:
+    return email.email_handler(
         event=event, event_to_msg_fn=sendgrid.event_to_msg_fn, sender_fn=sendgrid.sender_fn
     )
 
 
-def handler_smtp(event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> None:
+def handler_smtp(event: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> str:
     """
     Triggered from a message on a Pub/Sub topic to send as email.
 
@@ -111,11 +111,13 @@ def handler_smtp(event: Optional[Dict[str, Any]] = None, context: Optional[Any] 
     :param context: Metadata for the event.
     :return:
     """
-    _handler(_smtp_handler_fn, event, context)
+    return _handler(_smtp_handler_fn, event, context)
 
 
-def _smtp_handler_fn(event: Optional[Dict[str, Any]] = None, _: Any = None) -> None:
-    email.email_handler(event=event, event_to_msg_fn=smtp.event_to_msg_fn, sender_fn=smtp.sender_fn)
+def _smtp_handler_fn(event: Optional[Dict[str, Any]] = None, _: Any = None) -> str:
+    return email.email_handler(
+        event=event, event_to_msg_fn=smtp.event_to_msg_fn, sender_fn=smtp.sender_fn
+    )
 
 
 ####################

@@ -4,7 +4,6 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-
 from typing import Any, Dict, Optional
 
 from google.cloud import bigquery
@@ -196,7 +195,7 @@ def _mock_client(
         if project_id is not None:
             assert args[0] == project_id
             client.project = project_id
-        if location is not None:
+        if location is not None and len(args) > 1:
             assert args[1] == location
         return client
 
@@ -320,13 +319,11 @@ def test_list_all_tables_with_filter_ok_default_filter(monkeypatch):
     for ds in datasets:
         for t in tables:
             table_id = const.BQ_TABLE_FQN_ID_SEP.join([_TEST_PROJECT_ID, ds, t])
-            expected.add(f'{table_id}{const.BQ_TABLE_FQN_LOCATION_SEP}{_TEST_LOCATION}')
+            expected.add(f'{table_id}')
     client = _StubClient(list_datasets=datasets, list_tables=tables)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _bq_base.list_all_tables_with_filter(
-        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
-    )
+    result = _bq_base.list_all_tables_with_filter(project_id=_TEST_PROJECT_ID)
     # Then
     assert result
     s_result = set()
@@ -344,7 +341,7 @@ def test_list_all_tables_with_filter_ok_exclude_all_filter(monkeypatch):
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
     result = _bq_base.list_all_tables_with_filter(
-        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, filter_fn=lambda _: False
+        project_id=_TEST_PROJECT_ID, filter_fn=lambda _: False
     )
     # Then
     assert result
@@ -368,9 +365,7 @@ def test_list_all_tables_with_filter_nok_client_fails(monkeypatch, client_kwargs
     client = _StubClient(list_datasets=datasets, list_tables=tables, **client_kwargs)
     _mock_client(monkeypatch, client=client, project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION)
     # When
-    result = _bq_base.list_all_tables_with_filter(
-        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION
-    )
+    result = _bq_base.list_all_tables_with_filter(project_id=_TEST_PROJECT_ID)
     # Then
     with pytest.raises(ValueError):
         next(result)

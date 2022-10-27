@@ -8,14 +8,14 @@ import io
 import os
 import pathlib
 import pprint
-from typing import Generator, Tuple, Union
+from typing import Generator, Optional, Tuple, Union
 
 import attrs
 import click
 
-from bq_sampler.entity import policy as policy_
-from bq_sampler.entity import table
-from bq_sampler import sampler_bucket, process_request
+from bq_sampler.entity import policy as policy_, table
+from bq_sampler.gcp import bq
+from bq_sampler import process_request, sampler_bucket, sampler_query
 
 
 @click.group(help='Use this to test your policies and requests.')
@@ -78,7 +78,7 @@ def policy(  # pylint: disable=redefined-outer-name
             f'and policy_dir: {policy_dir}({type(policy_dir)})'
         )
     if policy_dir is None and request_dir:
-        print(
+        click.echo(
             f"Ignoring request dir <{request_dir}>({type(request_dir)} "
             "because it requires --policy-dir argument."
         )
@@ -118,7 +118,7 @@ def _read_policy_from_json(in_text: io.TextIOWrapper) -> policy_.Policy:
 
 
 def _print_display_separator() -> None:
-    print('#' * 20)
+    click.echo('#' * 20)
 
 
 def _print_policy_request(title: str, value: Union[policy_.Policy, table.Sample]) -> None:
@@ -161,9 +161,9 @@ def _read_request_for_policies(
     policy_dir = policy_dir.absolute()
     for req in _list_files_in_dir(request_dir):
         try:
-            print(policy_dir)
-            print(request_dir)
-            print(req)
+            click.echo(policy_dir)
+            click.echo(request_dir)
+            click.echo(req)
             pol_path = req.relative_to(request_dir).relative_to(policy_dir)
             with open(pol_path, encoding="UTF-8") as in_json:
                 req_sample = _read_sample_from_json(in_json)
@@ -171,17 +171,17 @@ def _read_request_for_policies(
                 req_policy = _read_policy_from_json(in_json)
             yield req_policy, req_sample
         except ValueError as err:
-            print(f"There is no policy for request {req}. Ignoring. Error: {err}")
+            click.echo(f"There is no policy for request {req}. Ignoring. Error: {err}")
 
 
 def _read_sample_from_json(in_text: io.TextIOWrapper) -> table.Sample:
     return table.Sample.from_json(in_text.read(), in_text.name)
 
 
-def _print_policy_request_pair(value: policy_.Policy, sample: table.Sample) -> None:
+def _print_policy_request_pair(value: policy_.Policy, tbl_sample: table.Sample) -> None:
     _print_display_separator()
     _print_policy_request("Specific policy", value)
-    _print_policy_request("Specific request", sample)
+    _print_policy_request("Specific request", tbl_sample)
 
 
 @cli.command(
@@ -241,6 +241,120 @@ def _patch_and_print_request(
     result = request_policy.compliant_sample(effective_request, size)
     _print_policy_request('Effective sample:', result)
     return result
+
+
+@cli.command(help='List all datasets')
+@click.option(
+    '--project-id',
+    '-p',
+    required=True,
+    type=str,
+    help='Google Cloud project ID.',
+)
+def list_tables(project_id: str) -> None:
+    """
+    List all tables for the project.
+
+    :param project_id:
+    :return:
+    """
+    click.echo(f'Listing all BigQuery datasets in {project_id}')
+    for ds_name in bq.list_all_tables_with_filter(project_id=project_id):
+        click.echo(f"\t{ds_name}")
+
+
+class GroupWithCommandOptions(click.Group):
+    # pylint: disable=line-too-long
+    """
+    Allow application of options to group with multi command
+    Source: https://stackoverflow.com/questions/44158287/adding-common-parameters-to-groups-with-click
+    """
+    # pylint: enable=line-too-long
+
+    def add_command(self, cmd, name=None):
+        """
+
+        :param cmd:
+        :param name:
+        :return:
+        """
+        click.Group.add_command(self, cmd, name=name)
+
+        # add the group parameters to the command
+        for param in self.params:
+            cmd.params.append(param)
+
+        # hook the commands invoke with our own
+        cmd.invoke = self.build_command_invoke(cmd.invoke)
+        self.invoke_without_command = False
+
+    def build_command_invoke(self, original_invoke):
+        """
+        Do nothing.
+        :param original_invoke:
+        :return:
+        """
+        return original_invoke
+
+
+@cli.group(cls=GroupWithCommandOptions, help='Lets you sample a table.')
+@click.option(
+    '--source',
+    required=False,
+    type=str,
+    help='BigQuery source table in the format: <PROJECT>.<DATASET>.<TABLE>',
+)
+@click.option(
+    '--target',
+    required=False,
+    type=str,
+    help='BigQuery target table in the format: <PROJECT>.<DATASET>.<TABLE>',
+)
+@click.option(
+    '--amount',
+    default=1,
+    required=False,
+    type=int,
+    help='How many rows to copy from source to target',
+)
+@click.pass_context
+def sample(  # pylint: disable=unused-argument
+    ctx: click.Context, source: str, target: str, amount: int
+) -> None:
+    """
+    Lets you sample a table.
+
+    :param ctx:
+    :param source:
+    :param target:
+    :param amount:
+    :return:
+    """
+
+
+@sample.command(name='random', help='Randomly sample a table')
+@click.pass_context
+def random_sample_table(  # pylint: disable=unused-argument
+    ctx: click.Context,
+    source: Optional[str] = None,
+    target: Optional[str] = None,
+    amount: Optional[int] = None,
+) -> None:
+    """
+    Lets you randomly sample a table.
+
+    :param ctx:
+    :param source:
+    :param target:
+    :param amount:
+    :return:
+    """
+    click.echo(f'Random sampling {amount} rows from {source} into {target}')
+    source_ref = table.TableReference.from_str(source)
+    target_ref = table.TableReference.from_str(target)
+    sampler_query.create_table_with_random_sample(
+        source_table_ref=source_ref, target_table_ref=target_ref, amount=amount
+    )
 
 
 if __name__ == '__main__':

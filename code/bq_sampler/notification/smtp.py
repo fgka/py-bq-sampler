@@ -15,12 +15,9 @@ from typing import Union
 
 import cachetools
 
-from bq_sampler import logger
-from bq_sampler import const
+from bq_sampler import const, logger
 from bq_sampler.entity import config
-from bq_sampler.gcp import secrets
-from bq_sampler.gcp import gcs
-from bq_sampler.gcp import pubsub
+from bq_sampler.gcp import gcs, pubsub, secrets
 
 _LOGGER = logger.get(__name__)
 # pylint: enable=duplicate-code

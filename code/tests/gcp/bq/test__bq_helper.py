@@ -4,7 +4,6 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-
 from typing import Dict, Generator, Optional
 
 from google.cloud import bigquery
@@ -124,9 +123,7 @@ def test_drop_all_tables_by_labels_ok(monkeypatch):
     # Given
     _mock_calls__big_query(monkeypatch, table_fqn_id_lst=[_TEST_SOURCE_TABLE_FQN_ID])
     # When/Then
-    _bq_helper.drop_all_tables_by_labels(
-        project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, labels=_TEST_LABELS
-    )
+    _bq_helper.drop_all_tables_by_labels(project_id=_TEST_PROJECT_ID, labels=_TEST_LABELS)
 
 
 def test_drop_all_tables_by_labels_nok(monkeypatch):
@@ -138,6 +135,4 @@ def test_drop_all_tables_by_labels_nok(monkeypatch):
     )
     # When/Then
     with pytest.raises(RuntimeError):
-        _bq_helper.drop_all_tables_by_labels(
-            project_id=_TEST_PROJECT_ID, location=_TEST_LOCATION, labels=_TEST_LABELS
-        )
+        _bq_helper.drop_all_tables_by_labels(project_id=_TEST_PROJECT_ID, labels=_TEST_LABELS)

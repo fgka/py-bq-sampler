@@ -12,11 +12,11 @@ List all project IDs that should be sampled. It assumes the following structure 
 import logging
 from typing import Any, Callable, Generator, Optional, Tuple
 
-from bq_sampler import const
-from bq_sampler.gcp import gcs
-from bq_sampler.entity import policy
-from bq_sampler.entity import table
-from bq_sampler import logger
+import cachetools
+
+from bq_sampler import const, logger
+from bq_sampler.gcp import bq, gcs
+from bq_sampler.entity import policy, table
 
 _LOGGER = logger.get(__name__)
 
@@ -24,7 +24,6 @@ _LOGGER = logger.get(__name__)
 def all_policies(
     bucket_name: str,
     default_policy_object_path: str,
-    location: Optional[str] = None,
     prefix: Optional[str] = None,
 ) -> Generator[policy.TablePolicy, None, None]:
     """
@@ -33,7 +32,6 @@ def all_policies(
 
     :param bucket_name:
     :param default_policy_object_path:
-    :param location:
     :param prefix: limits the search by prefix
     :return:
     """
@@ -45,7 +43,7 @@ def all_policies(
     # default policy
     default_policy = _default_policy(bucket_name, default_policy_object_path)
     # all policies
-    for table_policy in _retrieve_all_table_policies(bucket_name, default_policy, location, prefix):
+    for table_policy in _retrieve_all_table_policies(bucket_name, default_policy, prefix):
         yield table_policy
 
 
@@ -114,7 +112,6 @@ def _overwrite_policy(
 def _retrieve_all_table_policies(
     bucket_name: str,
     default_policy: policy.Policy,
-    location: Optional[str] = None,
     prefix: Optional[str] = None,
 ) -> Generator[policy.TablePolicy, None, None]:
     def convert_fn(table_reference, obj_path) -> policy.TablePolicy:
@@ -122,27 +119,22 @@ def _retrieve_all_table_policies(
         result = policy.TablePolicy(table_reference=table_reference, policy=actual_policy)
         return result
 
-    for table_policy in _retrieve_all_with_table_reference(
-        bucket_name, convert_fn, location, prefix
-    ):
+    for table_policy in _retrieve_all_with_table_reference(bucket_name, convert_fn, prefix):
         yield table_policy
 
 
 def _retrieve_all_with_table_reference(
     bucket_name: str,
     convert_fn: Callable[[table.TableReference, str], Any],
-    location: Optional[str] = None,
     prefix: Optional[str] = None,
 ) -> Generator[Any, None, None]:
 
-    for table_reference, obj_path in _list_all_table_references_obj_path(
-        bucket_name, location, prefix
-    ):
+    for table_reference, obj_path in _list_all_table_references_obj_path(bucket_name, prefix):
         yield convert_fn(table_reference, obj_path)
 
 
 def _list_all_table_references_obj_path(
-    bucket_name: str, location: Optional[str] = None, prefix: Optional[str] = None
+    bucket_name: str, prefix: Optional[str] = None
 ) -> Generator[Tuple[table.TableReference, str], None, None]:
     def filter_fn(value: str) -> bool:
         return value.endswith(const.JSON_EXT) and len(value.split('/')) == 3
@@ -150,20 +142,45 @@ def _list_all_table_references_obj_path(
     for obj_path in gcs.list_objects(bucket_name, filter_fn, prefix):
         project_id, dataset_id, table_id_file = obj_path.split('/')
         table_id = table_id_file[: -len(const.JSON_EXT)]
+        # resolve location
+        ds_location = _resolve_dataset_location(project_id, dataset_id)
         table_reference = table.TableReference(
-            project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=location
+            project_id=project_id, dataset_id=dataset_id, table_id=table_id, location=ds_location
         )
         yield table_reference, obj_path
 
 
-def all_sample_requests(
-    bucket_name: str, location: Optional[str] = None
-) -> Generator[table.TableSample, None, None]:
+@cachetools.cached(cache=cachetools.LRUCache(maxsize=1_000))
+def _resolve_dataset_location(project_id: str, dataset_id: str) -> str:
+    """
+    The footprint of this cache, in the worst case scenario,
+        is (assuming 256 characters per py:class:`str`):
+
+    * Key on the map have 2 UTF-8 strings, i.e., `2 * 256 * 16bits = 1,024bytes`;
+    * Value has 1 UTF-8 string, i.e, `256 * 16bits = 512bytes`;
+    * Map has 1000 entries and a load factor of 0.75.
+
+    This means that the cache will have, at most: `1,000 * (1,024 + 512) / 0.75 = 7,850.6bytes`.
+
+    Given the actual intent the cache, by design, should have only 1 entry.
+    This due to the design that per execution only a single dataset is processed.
+
+    :param project_id:
+    :param dataset_id:
+    :return:
+    """
+    result = None
+    dataset = bq.get_dataset(project_id, dataset_id)
+    if dataset is not None:
+        result = dataset.location
+    return result
+
+
+def all_sample_requests(bucket_name: str) -> Generator[table.TableSample, None, None]:
     """
     The output is already containing the requested samples
 
     :param bucket_name:
-    :param location:
     :return:
     """
     _LOGGER.info(
@@ -171,19 +188,17 @@ def all_sample_requests(
         bucket_name,
     )
     # all requests
-    for request in _retrieve_all_sample_requests(bucket_name, location):
+    for request in _retrieve_all_sample_requests(bucket_name):
         yield request
 
 
-def _retrieve_all_sample_requests(
-    bucket_name: str, location: Optional[str] = None
-) -> Generator[table.TableSample, None, None]:
+def _retrieve_all_sample_requests(bucket_name: str) -> Generator[table.TableSample, None, None]:
     def convert_fn(table_reference, obj_path) -> table.TableSample:
         table_sample = _sample_request(bucket_name, obj_path)
         result = table.TableSample(table_reference=table_reference, sample=table_sample)
         return result
 
-    for request in _retrieve_all_with_table_reference(bucket_name, convert_fn, location):
+    for request in _retrieve_all_with_table_reference(bucket_name, convert_fn):
         yield request
 
 
@@ -196,7 +211,7 @@ def _sample_request(bucket_name: str, request_filename: str) -> table.Sample:
 
 
 def sample_request_from_policy(
-    bucket_name: str, table_policy: policy.TablePolicy, location: Optional[str] = None
+    bucket_name: str, table_policy: policy.TablePolicy
 ) -> table.TableSample:
     """
     For a given :py:class:`policy.TablePolicy` create a corresponding
@@ -205,13 +220,10 @@ def sample_request_from_policy(
 
     :param bucket_name:
     :param table_policy:
-    :param location:
     :return:
     """
     # get overwritten request with policy default sample
     table_ref = table_policy.table_reference
-    if isinstance(location, str):
-        table_ref = table_ref.clone(location=location)
     req_sample = _sample_request(bucket_name, _json_object_path(table_ref))
     effective_sample = _overwrite_request(req_sample, table_policy.policy)
     result = table.TableSample(table_reference=table_ref, sample=effective_sample)

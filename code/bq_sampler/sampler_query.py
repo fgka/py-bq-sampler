@@ -9,13 +9,13 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 # pylint: enable=line-too-long
 import math
 from typing import Any, Dict, List, Optional, Tuple
+import uuid
 
 from google.cloud import bigquery
 
-from bq_sampler import const
+from bq_sampler import const, logger
 from bq_sampler.entity import table
 from bq_sampler.gcp import bq
-from bq_sampler import logger
 
 _LOGGER = logger.get(__name__)
 
@@ -262,18 +262,31 @@ def _validate_order(order: str) -> str:
 def drop_all_sample_tables(
     *,
     project_id: str,
-    location: Optional[str] = None,
     labels: Optional[Dict[str, str]] = None,
 ) -> None:
     """
     Just a wrapper for :py:func:`bq.drop_all_tables_by_labels`.
 
     :param project_id:
-    :param location:
     :param labels:
     :return:
     """
-    bq.drop_all_tables_by_labels(project_id=project_id, location=location, labels=labels)
+    bq.drop_all_tables_by_labels(project_id=project_id, labels=labels)
+
+
+def remove_all_empty_sample_datasets(
+    *,
+    project_id: str,
+    labels: Optional[Dict[str, str]] = None,
+) -> None:
+    """
+    Just a wrapper for :py:func:`bq.remove_all_empty_datasets_by_labels`.
+
+    :param project_id:
+    :param labels:
+    :return:
+    """
+    bq.remove_all_empty_datasets_by_labels(project_id=project_id, labels=labels)
 
 
 def create_table_with_random_sample(
@@ -282,6 +295,8 @@ def create_table_with_random_sample(
     target_table_ref: table.TableReference,
     amount: int,
     labels: Optional[Dict[str, str]] = None,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
@@ -292,6 +307,8 @@ def create_table_with_random_sample(
     :param target_table_ref:
     :param amount:
     :param labels:
+    :param notification_pubsub_topic:
+    :param bq_transfer_sa:
     :param recreate_table: if :py:obj:`True` (default) will drop the table prior to create it.
         If the table does not exist, it will ignore the drop.
     :return: amount of rows inserted
@@ -299,14 +316,32 @@ def create_table_with_random_sample(
     # validate input
     _validate_table_to_table_sample(source_table_ref, target_table_ref)
     _validate_amount(amount)
+    labels = _add_standard_labels(source_table_ref, labels)
     # logic
     return _create_table_with_random_sample(
-        source_table_ref,
-        target_table_ref,
-        amount,
-        labels,
-        recreate_table,
+        source_table_ref=source_table_ref,
+        target_table_ref=target_table_ref,
+        amount=amount,
+        labels=labels,
+        notification_pubsub_topic=notification_pubsub_topic,
+        bq_transfer_sa=bq_transfer_sa,
+        recreate_table=recreate_table,
     )
+
+
+def _add_standard_labels(
+    source_table_ref: table.TableReference, value: Optional[Dict[str, str]] = None
+) -> Dict[str, str]:
+    if not isinstance(value, dict):
+        value = {}
+    value = {
+        **value,
+        **dict(
+            source_project_id=source_table_ref.project_id,
+            source_location=source_table_ref.location,
+        ),
+    }
+    return value
 
 
 def _validate_table_to_table_sample(
@@ -315,23 +350,30 @@ def _validate_table_to_table_sample(
 ) -> None:
     _validate_table_reference('source_table_ref', source_table_ref)
     _validate_table_reference('target_table_ref', target_table_ref)
-    if source_table_ref.location != target_table_ref.location:
-        raise ValueError(
-            'Source and target tables must be in the same region. '
-            f'Got, source <{source_table_ref}> and target: <{target_table_ref}>'
-        )
+    _LOGGER.warning(
+        'Source <%s> and target <%s> tables are not in the same location. '
+        'It will increase costs.',
+        source_table_ref,
+        target_table_ref,
+    )
 
 
 def _create_table_with_random_sample(
+    *,
     source_table_ref: table.TableReference,
     target_table_ref: table.TableReference,
     amount: int,
     labels: Optional[Dict[str, str]] = None,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
-    # create table
-    _create_table(
-        source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
+    # setup
+    staging_target_table_ref = _pre_sample_setup(
+        source_table_ref=source_table_ref,
+        target_table_ref=target_table_ref,
+        labels=labels,
+        recreate_table=recreate_table,
     )
     # insert data
     percent_int = _int_percent_for_tablesample_stmt(source_table_ref.table_fqn_id(), amount)
@@ -346,19 +388,45 @@ def _create_table_with_random_sample(
     else:
         query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
             source_table_fqn_id=source_table_ref.table_fqn_id(False),
-            target_table_fqn_id=target_table_ref.table_fqn_id(False),
+            target_table_fqn_id=staging_target_table_ref.table_fqn_id(False),
             amount=amount,
             percent_int=percent_int,
         )
-        bq.query_job_result(
+        _sample_query_execution(
             query=_BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL % query_placeholders,
-            project_id=target_table_ref.project_id,
-            location=target_table_ref.location,
+            staging_target_table_ref=staging_target_table_ref,
+            target_table_ref=target_table_ref,
+            notification_pubsub_topic=notification_pubsub_topic,
+            bq_transfer_sa=bq_transfer_sa,
         )
     return row_count(target_table_ref)
 
 
+def _pre_sample_setup(
+    *,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
+) -> table.TableReference:
+    # create target table
+    _create_table(
+        source_table_fqn_id=source_table_ref.table_fqn_id(),
+        target_table_fqn_id=target_table_ref.table_fqn_id(),
+        labels=labels,
+        recreate_table=recreate_table,
+    )
+    # return target staging table
+    return _staging_target_table_ref(
+        source_table_ref=source_table_ref,
+        target_table_ref=target_table_ref,
+        labels=labels,
+        recreate_table=recreate_table,
+    )
+
+
 def _create_table(
+    *,
     source_table_fqn_id: str,
     target_table_fqn_id: str,
     labels: Optional[Dict[str, str]] = None,
@@ -373,6 +441,85 @@ def _create_table(
     )
 
 
+def _staging_target_table_ref(
+    *,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
+    labels: Optional[Dict[str, str]] = None,
+    recreate_table: Optional[bool] = True,
+) -> table.TableReference:
+    result = target_table_ref
+    # for different locations we need to have a stage table for sampling
+    # and then transfer to the correct region
+    if source_table_ref.location != target_table_ref.location:
+        dataset_id = _staging_dataset_id(source_table_ref, target_table_ref)
+        # create temp table on different temp dataset in the same location
+        result = target_table_ref.clone(dataset_id=dataset_id, location=source_table_ref.location)
+        _create_table(
+            source_table_fqn_id=source_table_ref.table_fqn_id(),
+            target_table_fqn_id=result.table_fqn_id(),
+            labels=labels,
+            recreate_table=recreate_table,
+        )
+    return result
+
+
+def _staging_dataset_id(
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
+) -> str:
+    return bq.bigquery_valid_string(
+        f'{target_table_ref.dataset_id[0:200]}_temp'
+        f'_{target_table_ref.table_id[0:200]}'
+        f'_{source_table_ref.location[0:200]}'
+        f'_{uuid.uuid4()}'
+    )
+
+
+def _sample_query_execution(
+    *,
+    query: str,
+    staging_target_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
+) -> None:
+    bq.query_job_result(
+        query=query,
+        project_id=staging_target_table_ref.project_id,
+        location=staging_target_table_ref.location,
+    )
+    if staging_target_table_ref != target_table_ref:
+        # since there was a staging table, we need to transfer to the target table
+        _transfer_content_x_location(
+            source_table_ref=staging_target_table_ref,
+            target_table_ref=target_table_ref,
+            notification_pubsub_topic=notification_pubsub_topic,
+            bq_transfer_sa=bq_transfer_sa,
+            drop_source_table=True,
+        )
+
+
+def _transfer_content_x_location(
+    *,
+    source_table_ref: table.TableReference,
+    target_table_ref: table.TableReference,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
+    drop_source_table: Optional[bool] = True,
+) -> None:
+    if source_table_ref.location != target_table_ref.location:
+        # A transfer needs to happen
+        bq.cross_location_copy(
+            source_table_fqn_id=source_table_ref.table_fqn_id(),
+            target_table_fqn_id=target_table_ref.table_fqn_id(),
+            notification_pubsub_topic=notification_pubsub_topic,
+            bq_transfer_sa=bq_transfer_sa,
+        )
+        if drop_source_table:
+            bq.drop_table(table_fqn_id=source_table_ref.table_fqn_id(), not_found_ok=True)
+
+
 def create_table_with_sorted_sample(
     *,
     source_table_ref: table.TableReference,
@@ -381,6 +528,8 @@ def create_table_with_sorted_sample(
     column: str,
     order: str,
     labels: Optional[Dict[str, str]] = None,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
@@ -393,38 +542,49 @@ def create_table_with_sorted_sample(
     :param column:
     :param order:
     :param labels:
+    :param notification_pubsub_topic:
+    :param bq_transfer_sa:
     :param recreate_table:
     :return: amount of rows inserted
     """
     # validate input
     _validate_table_to_table_sample(source_table_ref, target_table_ref)
     _validate_amount(amount)
+    labels = _add_standard_labels(source_table_ref, labels)
     (column,) = _validate_str_args(column)
     order = _validate_order(order)
     # logic
     return _create_table_with_sorted_sample(
-        source_table_ref,
-        target_table_ref,
-        amount,
-        column,
-        order,
-        labels,
-        recreate_table,
+        source_table_ref=source_table_ref,
+        target_table_ref=target_table_ref,
+        amount=amount,
+        column=column,
+        order=order,
+        labels=labels,
+        notification_pubsub_topic=notification_pubsub_topic,
+        bq_transfer_sa=bq_transfer_sa,
+        recreate_table=recreate_table,
     )
 
 
 def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
+    *,
     source_table_ref: table.TableReference,
     target_table_ref: table.TableReference,
     amount: int,
     column: str,
     order: str,
     labels: Optional[Dict[str, str]] = None,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
-    # create table
-    _create_table(
-        source_table_ref.table_fqn_id(), target_table_ref.table_fqn_id(), labels, recreate_table
+    # setup
+    staging_target_table_ref = _pre_sample_setup(
+        source_table_ref=source_table_ref,
+        target_table_ref=target_table_ref,
+        labels=labels,
+        recreate_table=recreate_table,
     )
     # insert data
     if amount <= 0:
@@ -436,14 +596,16 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     else:
         query_placeholders = _named_placeholders(  # pylint: disable=missing-kwoa
             source_table_fqn_id=source_table_ref.table_fqn_id(False),
-            target_table_fqn_id=target_table_ref.table_fqn_id(False),
+            target_table_fqn_id=staging_target_table_ref.table_fqn_id(False),
             amount=amount,
             column=column,
             order=order,
         )
-        bq.query_job_result(
+        _sample_query_execution(
             query=_BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL % query_placeholders,
-            project_id=target_table_ref.project_id,
-            location=target_table_ref.location,
+            staging_target_table_ref=staging_target_table_ref,
+            target_table_ref=target_table_ref,
+            notification_pubsub_topic=notification_pubsub_topic,
+            bq_transfer_sa=bq_transfer_sa,
         )
     return row_count(target_table_ref)

@@ -6,7 +6,7 @@
 # type: ignore
 import os
 import pathlib
-from typing import Any, Callable, Dict, Generator, Optional
+from typing import Any, Dict, Generator, Optional
 
 POLICY_BUCKET: str = 'policy_bucket'
 REQUEST_BUCKET: str = 'request_bucket'
@@ -14,9 +14,8 @@ REQUEST_BUCKET: str = 'request_bucket'
 _TEST_DATA_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.parent.joinpath('test_data')
 
 
-def read_object(
-    bucket_name: str, object_path: str, warn_read_failure: Optional[bool] = True
-) -> bytes:
+# pylint: disable=unused-argument
+def read_object(bucket_name: str, object_path: str, warn_read_failure: Optional[bool]) -> bytes:
     """
     To mimic `gcp_storage.read_object(bucket_name, object_path)`.
     :param bucket_name:
@@ -25,6 +24,9 @@ def read_object(
     :return:
     """
     return _read_bytes(_get_bucket_path(bucket_name, object_path))
+
+
+# pylint: enable=unused-argument
 
 
 def _get_bucket_path(bucket_name: str, object_path: str) -> pathlib.Path:

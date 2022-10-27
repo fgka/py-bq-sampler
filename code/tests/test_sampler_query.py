@@ -4,16 +4,15 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 from google.cloud import bigquery
+from google.cloud import bigquery_datatransfer
 
 import pytest
 
-from bq_sampler import const
+from bq_sampler import const, sampler_query
 from bq_sampler.entity import table
-from bq_sampler import sampler_query
 
 
 _TEST_SOURCE_TABLE_FQN_ID: str = (
@@ -120,6 +119,18 @@ def _mock_calls_bq(
         pass
 
     monkeypatch.setattr(sampler_query.bq, 'create_table', mocked_bq_create_table)
+
+    def mocked_cross_location_copy(  # pylint: disable=unused-argument
+        *args, **kwargs
+    ) -> Sequence[bigquery_datatransfer.TransferRun]:
+        pass
+
+    monkeypatch.setattr(sampler_query.bq, 'cross_location_copy', mocked_cross_location_copy)
+
+    def mocked_drop_table(*args, **kwargs) -> None:  # pylint: disable=unused-argument
+        pass
+
+    monkeypatch.setattr(sampler_query.bq, 'drop_table', mocked_drop_table)
 
 
 @pytest.mark.parametrize(
@@ -274,6 +285,25 @@ def test_create_table_with_random_sample_ok(monkeypatch):
     assert isinstance(result, int)
 
 
+def test_create_table_with_random_sample_ok_different_locations(monkeypatch):
+    # Given
+    amount = _TEST_SAMPLE_AMOUNT
+    query_validation_fn = _query_validation_fn(is_random_query=True, has_insert=True)
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_random_sample(
+        source_table_ref=_TEST_SOURCE_TABLE_REF,
+        target_table_ref=_TEST_TARGET_DIFF_LOC_TABLE_REF,
+        amount=amount,
+    )
+    # Then
+    assert isinstance(result, int)
+
+
 def test_create_table_with_random_sample_ok_0_amount(monkeypatch):
     # Given
     amount = 0
@@ -300,11 +330,6 @@ def test_create_table_with_random_sample_ok_0_amount(monkeypatch):
         (None, _TEST_TARGET_TABLE_REF, _TEST_SAMPLE_AMOUNT),
         (_TEST_SOURCE_TABLE_REF, None, _TEST_SAMPLE_AMOUNT),
         (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, None),
-        (
-            _TEST_SOURCE_TABLE_REF,
-            _TEST_TARGET_DIFF_LOC_TABLE_REF,
-            _TEST_SAMPLE_AMOUNT,
-        ),  # different regions
         (_TEST_SOURCE_TABLE_REF, _TEST_TARGET_TABLE_REF, -1),
     ],
 )
@@ -384,13 +409,6 @@ def test_create_table_with_sorted_sample_ok(monkeypatch):
         ),
         (
             _TEST_SOURCE_TABLE_REF,
-            _TEST_TARGET_DIFF_LOC_TABLE_REF,
-            _TEST_SAMPLE_AMOUNT,
-            _TEST_SORT_COLUMN_NAME,
-            _TEST_SORT_ORDER,
-        ),  # different regions
-        (
-            _TEST_SOURCE_TABLE_REF,
             _TEST_TARGET_TABLE_REF,
             -1,
             _TEST_SORT_COLUMN_NAME,
@@ -447,3 +465,24 @@ def test_create_table_with_sorted_sample_nok(  # pylint: disable=too-many-argume
             column=column,
             order=order,
         )
+
+
+def test_create_table_with_sorted_sample_ok_different_locations(monkeypatch):
+    # Given
+    amount = _TEST_SAMPLE_AMOUNT
+    query_validation_fn = _query_validation_fn(is_random_query=False, has_insert=True)
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_sorted_sample(
+        source_table_ref=_TEST_SOURCE_TABLE_REF,
+        target_table_ref=_TEST_TARGET_DIFF_LOC_TABLE_REF,
+        amount=amount,
+        column=_TEST_SORT_COLUMN_NAME,
+        order=_TEST_SORT_ORDER,
+    )
+    # Then
+    assert isinstance(result, int)
