@@ -6,6 +6,7 @@
 # type: ignore
 import json
 from typing import Any, Callable, Dict
+
 import pytest
 
 from bq_sampler.notification import email

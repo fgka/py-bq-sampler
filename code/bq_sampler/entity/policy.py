@@ -7,8 +7,7 @@ import math
 import attrs
 
 from bq_sampler import const
-from bq_sampler.entity import attrs_defaults
-from bq_sampler.entity import table
+from bq_sampler.entity import attrs_defaults, table
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)

@@ -41,12 +41,21 @@ def _create_event_str(data: Any) -> str:
     return dict(data=data_str)
 
 
+_ISO_DATE_STR_PREFIX: str = '2022-10-07T11:01:38'
+_ISO_DATE_TO_TS: str = 1665140498
+
+
 @pytest.mark.parametrize(
     'value,expected',
     [
-        ('2022-10-07T11:01:38', 1665140498),
-        ('2022-10-07T11:01:38Z', 1665140498),
-        ('2022-10-07T11:01:38.123Z', 1665140498),
+        (_ISO_DATE_STR_PREFIX, _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.1', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.12', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.123', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + 'Z', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.1Z', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.12Z', _ISO_DATE_TO_TS),
+        (_ISO_DATE_STR_PREFIX + '.123Z', _ISO_DATE_TO_TS),
     ],
 )
 def test__extract_timestamp_from_iso_str_ok(value: str, expected: int):
@@ -54,3 +63,13 @@ def test__extract_timestamp_from_iso_str_ok(value: str, expected: int):
     result = entry._extract_timestamp_from_iso_str(value)
     # Then
     assert result == expected
+
+
+def test_handler_nok_empty_args():
+    # Given
+    event = {}
+    context = None
+    # When
+    response = entry.handler(event, context)
+    # Then
+    assert 'Could not process event:' in response

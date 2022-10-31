@@ -9,8 +9,8 @@ from email import message
 import json
 from typing import Any, Dict
 
-from bq_sampler.notification import smtp
 from bq_sampler.entity import config
+from bq_sampler.notification import smtp
 
 
 _TEST_EVENT: Dict[str, Any] = {'key_a': 'value_a', 'key_b': 123}

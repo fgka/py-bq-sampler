@@ -15,7 +15,7 @@ def email_handler(
     event: Dict[str, Any],
     event_to_msg_fn: Callable[[Dict[str, Any]], Any],
     sender_fn: Callable[[Any], None],
-) -> None:
+) -> str:
     """
     Triggered from a message on a Pub/Sub topic.
 
@@ -47,3 +47,4 @@ def email_handler(
             f' Event: {event}, error: {err}'
         ) from err
     _LOGGER.debug('Message sent for event: %s', event)
+    return f'Done with event {event}'

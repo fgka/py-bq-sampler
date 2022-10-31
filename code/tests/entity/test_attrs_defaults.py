@@ -4,7 +4,6 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-
 from typing import Any, Dict, List, Optional
 
 import pytest

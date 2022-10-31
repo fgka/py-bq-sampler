@@ -4,18 +4,21 @@ Processes a request coming from Cloud Function.
 """
 import os
 import time
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 
 import cachetools
 
 from bq_sampler.entity import command, table, policy
-from bq_sampler import sampler_bucket, sampler_query
-from bq_sampler.gcp import gcs, pubsub
-from bq_sampler import const, logger
+from bq_sampler import const, logger, sampler_bucket, sampler_query
+from bq_sampler.gcp import bq, gcs, pubsub
 
 _LOGGER = logger.get(__name__)
 
-_BQ_LOCATION_ENV_VAR: str = 'BQ_LOCATION'  # europe-west3
+_BQ_TARGET_LOCATION_ENV_VAR: str = 'BQ_TARGET_LOCATION'  # europe-west3
+_BQ_TRANSFER_NOTIFICATION_TOPIC_ENV_VAR: str = (
+    'BQ_TRANSFER_NOTIFICATION_TOPIC'  # projects/py-project-12345/topics/bq-notification-topic-name
+)
+_BQ_TRANSFER_SA_EMAIL_ENV_VAR: str = 'BQ_TRANSFER_SA_EMAIL'
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default_policy.json
@@ -34,7 +37,7 @@ _PUBSUB_ERROR_MSG_ENTRY: str = 'error'
 
 class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
     def __init__(self):
-        self._location = os.environ.get(_BQ_LOCATION_ENV_VAR)
+        self._target_location = os.environ.get(_BQ_TARGET_LOCATION_ENV_VAR)
         self._target_project_id = os.environ.get(_BQ_TARGET_PROJECT_ID_ENV_VAR)
         self._policy_bucket = os.environ.get(_GCS_POLICY_BUCKET_ENV_VAR)
         self._default_policy_path = os.environ.get(
@@ -43,13 +46,15 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         self._request_bucket = os.environ.get(_GCS_REQUEST_BUCKET_ENV_VAR)
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
+        self._pubsub_bq_notification = os.environ.get(_BQ_TRANSFER_NOTIFICATION_TOPIC_ENV_VAR)
+        self._bq_transfer_sa = os.environ.get(_BQ_TRANSFER_SA_EMAIL_ENV_VAR)
         self._sampling_lock_path = os.environ.get(
             _SAMPLING_LOCK_OBJECT_PATH_ENV_VAR, _DEFAULT_SAMPLING_LOCK_OBJECT_PATH
         )
 
     @property
-    def location(self) -> str:  # pylint: disable=missing-function-docstring
-        return self._location
+    def target_location(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._target_location
 
     @property
     def target_project_id(self) -> str:  # pylint: disable=missing-function-docstring
@@ -76,11 +81,19 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         return self._pubsub_error
 
     @property
+    def pubsub_bq_notification(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._pubsub_bq_notification
+
+    @property
+    def bq_transfer_sa(self) -> str:  # pylint: disable=missing-function-docstring
+        return self._bq_transfer_sa
+
+    @property
     def sampling_lock_path(self) -> str:  # pylint: disable=missing-function-docstring
         return self._sampling_lock_path
 
 
-def process(value: command.CommandBase) -> None:
+def process(value: command.CommandBase) -> str:
     """
     Single entry point to process commands coming from Pub/Sub.
 
@@ -90,14 +103,16 @@ def process(value: command.CommandBase) -> None:
     _LOGGER.info('Processing command <%s>', value)
     try:
         _process(value)
-        _LOGGER.debug('Processed command <%s>', value)
-    except Exception as err:
+        _LOGGER.info('Processed command <%s>', value)
+    except Exception as err:  # pylint: disable=broad-except
         error_data = {
             _PUBSUB_ERROR_CMD_ENTRY: value.as_dict(),
             _PUBSUB_ERROR_MSG_ENTRY: str(err),
         }
         pubsub.publish(error_data, _general_config().pubsub_error)
+        _LOGGER.error('Sent error to %s. Message: %s', _general_config().pubsub_error, error_data)
         raise RuntimeError(f'Could not process command: <{value}>. Error: {err}') from err
+    return 'OK'
 
 
 def _process(value: command.CommandBase) -> None:
@@ -109,6 +124,10 @@ def _process(value: command.CommandBase) -> None:
         _process_sample_start(value)
     elif value.type == command.CommandType.SAMPLE_DONE.value:
         _process_sample_done(value)
+    elif value.type == command.CommandType.TRANSFER_RUN_DONE.value:
+        _process_transfer_run_done(value)
+    elif value.type == command.CommandType.REMOVE_DATASET.value:
+        _process_remove_dataset(value)
     else:
         raise ValueError(f'Command type <{value.type}> cannot be processed')
 
@@ -139,9 +158,8 @@ def _process_start(value: command.CommandStart) -> None:
 
 def _process_start_ok(value: command.CommandStart) -> None:
     _LOGGER.debug('Dropping all sample tables in <%s>', _general_config().target_project_id)
-    sampler_query.drop_all_sample_tables(
-        project_id=_general_config().target_project_id, location=_general_config().location
-    )
+    sampler_query.drop_all_sample_tables(project_id=_general_config().target_project_id)
+    sampler_query.remove_all_empty_sample_datasets(project_id=_general_config().target_project_id)
 
     def prefix_filter_fn(full_path: str) -> bool:
         return len(full_path.strip(const.GS_PREFIX_DELIM).split(const.GS_PREFIX_DELIM)) == 2
@@ -191,7 +209,6 @@ def _process_sample_policy_prefix_ok(value: command.CommandSamplePolicyPrefix) -
     for table_policy in sampler_bucket.all_policies(
         bucket_name=_general_config().policy_bucket,
         default_policy_object_path=_general_config().default_policy_path,
-        location=_general_config().location,
         prefix=value.prefix,
     ):
         _LOGGER.info(
@@ -208,7 +225,9 @@ def _process_sample_policy_prefix_ok(value: command.CommandSamplePolicyPrefix) -
             # compliance enforcement
             table_sample = _compliant_sample_request(table_policy, table_sample)
             # create sample request event
-            start_sample_req = _create_sample_start_cmd(value, table_policy, table_sample)
+            start_sample_req = _create_sample_start_cmd(
+                value, table_policy, table_sample, _general_config().target_location
+            )
             # send request out
             _publish_cmd_to_pubsub(start_sample_req)
         except Exception as err:  # pylint: disable=broad-except
@@ -235,6 +254,7 @@ def _create_sample_start_cmd(
     value: command.CommandSamplePolicyPrefix,
     table_policy: policy.TablePolicy,
     table_sample: table.TableSample,
+    target_location: Optional[str] = None,
 ) -> command.CommandSampleStart:
     source_table = table_policy.table_reference
     kwargs = {
@@ -242,7 +262,8 @@ def _create_sample_start_cmd(
         command.CommandSampleStart.timestamp.__name__: value.timestamp,
         command.CommandSampleStart.sample_request.__name__: table_sample,
         command.CommandSampleStart.target_table.__name__: source_table.clone(
-            project_id=_general_config().target_project_id
+            project_id=_general_config().target_project_id,
+            location=target_location,
         ),
     }
     return command.CommandSampleStart(**kwargs)
@@ -272,6 +293,8 @@ def _process_sample_start(value: command.CommandSampleStart) -> None:
         source_table_ref=value.sample_request.table_reference,
         target_table_ref=value.target_table,
         amount=value.sample_request.sample.size.count,
+        # notification_pubsub_topic=_general_config().pubsub_bq_notification,
+        # bq_transfer_sa=_general_config().bq_transfer_sa,
         recreate_table=True,
     )
     amount_inserted = 0
@@ -316,6 +339,116 @@ def _create_sample_done_cmd(
     return command.CommandSampleDone(**kwargs)
 
 
+def _process_transfer_run_done(value: command.CommandTransferRunDone) -> None:
+    # pylint: disable=line-too-long
+    """
+    Checks the state and, if successful, removes the transfer config and source dataset.
+
+    Example payload::
+        {
+          "dataSourceId": "cross_region_copy",
+          "destinationDatasetId": "new_york_taxi_trips",
+          "emailPreferences": {
+
+          },
+          "endTime": "2022-10-26T13:36:24.042815Z",
+          "errorStatus": {
+
+          },
+          "name": "projects/831514123984/locations/europe-west4/transferConfigs/63592c65-0000-2ee6-9089-30fd3811ab04/runs/635917b1-0000-2fdd-9bf9-089e08257ad8",
+          "notificationPubsubTopic": "projects/tgt-bq/topics/test-trnsfer",
+          "params": {
+            "overwrite_destination_table": true,
+            "source_dataset_id": "new_york_taxi_trips_europe_west3_temp",
+            "source_project_id": "tgt-bq"
+          },
+          "runTime": "2022-10-26T13:35:08.333Z",
+          "scheduleTime": "2022-10-26T13:35:08.810982Z",
+          "state": "SUCCEEDED",
+          "updateTime": "2022-10-26T13:36:24.042825Z",
+          "userId": "4735888344461745670"
+        }
+
+    :param value:
+    :return:
+    """
+    # pylint: enable=line-too-long
+    _LOGGER.info('Processing transfer run completion <%s>', value)
+    # validate state
+    state = value.payload.get(const.TRANSFER_RUN_STATE_ATTR)
+    if state != const.TRANSFER_RUN_STATE_SUCCEEDED_VALUE:
+        raise RuntimeError(
+            f'Transfer Run did not succeeded (state <{state}>), therefore not removing'
+        )
+    # remove transfer config
+    bq.remove_transfer_config(value.name)
+    # send remove dataset command
+    project_id, dataset_id = _extract_source_dataset_from_transfer_run_payload(value.payload)
+    remove_dataset = _create_remove_dataset_cmd(project_id, dataset_id)
+    pubsub.publish(remove_dataset.as_dict(), _general_config().pubsub_request)
+
+
+def _extract_source_dataset_from_transfer_run_payload(payload: Dict[str, Any]) -> Tuple[str, str]:
+    # pylint: disable=line-too-long
+    """
+    Example payload::
+        {
+          "dataSourceId": "cross_region_copy",
+          "destinationDatasetId": "new_york_taxi_trips",
+          "emailPreferences": {
+
+          },
+          "endTime": "2022-10-26T13:36:24.042815Z",
+          "errorStatus": {
+
+          },
+          "name": "projects/831514123984/locations/europe-west4/transferConfigs/63592c65-0000-2ee6-9089-30fd3811ab04/runs/635917b1-0000-2fdd-9bf9-089e08257ad8",
+          "notificationPubsubTopic": "projects/tgt-bq/topics/test-trnsfer",
+          "params": {
+            "overwrite_destination_table": true,
+            "source_dataset_id": "new_york_taxi_trips_europe_west3_temp",
+            "source_project_id": "tgt-bq"
+          },
+          "runTime": "2022-10-26T13:35:08.333Z",
+          "scheduleTime": "2022-10-26T13:35:08.810982Z",
+          "state": "SUCCEEDED",
+          "updateTime": "2022-10-26T13:36:24.042825Z",
+          "userId": "4735888344461745670"
+        }
+
+    :param payload:
+    :return:
+    """
+    # pylint: enable=line-too-long
+    project_id = None
+    dataset_id = None
+    params = payload.get(const.TRANSFER_RUN_PARAMS_ATTR)
+    if isinstance(params, dict):
+        project_id = params.get(const.TRANSFER_RUN_PARAMS_SOURCE_PROJECT_ID_ATTR)
+        dataset_id = params.get(const.TRANSFER_RUN_PARAMS_SOURCE_DATASET_ID_ATTR)
+    return project_id, dataset_id
+
+
+def _create_remove_dataset_cmd(project_id: str, dataset_id: str) -> command.CommandRemoveDataset:
+    kwargs = {
+        command.CommandRemoveDataset.type.__name__: command.CommandType.REMOVE_DATASET.value,
+        command.CommandRemoveDataset.project_id.__name__: project_id,
+        command.CommandRemoveDataset.dataset_id.__name__: dataset_id,
+    }
+    return command.CommandRemoveDataset(**kwargs)
+
+
+def _process_remove_dataset(value: command.CommandRemoveDataset) -> None:
+    """
+    Removes a dataset
+
+    :param value:
+    :return:
+    """
+    _LOGGER.info('Removing dataset <%s>', value)
+    bq.remove_dataset(project_id=value.project_id, dataset_id=value.dataset_id)
+
+
 def _process_sample_done(value: command.CommandSampleDone) -> None:
     """
     Collect the signal that a given sampling request has finished, logging it.
@@ -328,7 +461,7 @@ def _process_sample_done(value: command.CommandSampleDone) -> None:
 
 
 if __name__ == '__main__':
-    os.environ.setdefault(_BQ_LOCATION_ENV_VAR, 'europe-west3')
+    os.environ.setdefault(_BQ_TARGET_LOCATION_ENV_VAR, 'europe-west3')
     os.environ.setdefault(_BQ_TARGET_PROJECT_ID_ENV_VAR, 'tgt-bq')
     os.environ.setdefault(_GCS_POLICY_BUCKET_ENV_VAR, 'test-list-blobs')
     os.environ.setdefault(_GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR, 'default-policy.json')

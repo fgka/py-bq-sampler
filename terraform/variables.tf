@@ -12,6 +12,12 @@ variable "target_project_id" {
   type        = string
 }
 
+variable "bq_target_location" {
+  description = "In which region to send the samples to in the target project."
+  type        = string
+  default     = null
+}
+
 variable "region" {
   description = "Default region where to create resources."
   type        = string
@@ -176,6 +182,18 @@ variable "pubsub_error_topic_name" {
   description = "Name of the PubSub topic to send error notifications from the Cloud Function."
   type        = string
   default     = "bq-sampler-err"
+}
+
+variable "pubsub_bq_notification_topic_name" {
+  description = "Name of the PubSub topic to send BigQuery transfer runs' notifications to."
+  type        = string
+  default     = "bq-sampler-bq-transfer-notification"
+}
+
+variable "pubsub_cmd_service_account_name" {
+  description = "Service account to be used by PuSub to trigger sampler function."
+  type        = string
+  default     = "bq-sampler-pubsub-sa"
 }
 
 ///////////////////////

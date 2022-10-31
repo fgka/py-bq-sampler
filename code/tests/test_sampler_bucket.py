@@ -4,12 +4,11 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-
+import types
 from typing import Set
 
+from bq_sampler import const, sampler_bucket
 from bq_sampler.entity import policy
-from bq_sampler import const
-from bq_sampler import sampler_bucket
 
 from tests.gcp import gcs_on_disk
 
@@ -19,6 +18,7 @@ _GENERAL_POLICY_PATH: str = 'default_policy.json'
 def test__fetch_gcs_object_as_json_string_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
+    _mock_bq_base_dataset(monkeypatch)
     # When
     result = sampler_bucket._fetch_gcs_object_as_string(
         gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH
@@ -37,6 +37,20 @@ def _patch_gcs_storage(monkeypatch):
     monkeypatch.setattr(sampler_bucket.gcs, '_list_blob_names', gcs_on_disk.list_blob_names)
 
 
+def _mock_bq_base_dataset(monkeypatch) -> None:
+
+    dataset = types.SimpleNamespace()
+    setattr(dataset, 'location', 'test_location')
+
+    # pylint: disable=unused-argument
+    def mocked_dataset(*args, **kwargs) -> object:
+        return dataset
+
+    # pylint: enable=unused-argument
+
+    monkeypatch.setattr(sampler_bucket.bq, 'get_dataset', mocked_dataset)
+
+
 def test__default_policy_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
@@ -50,6 +64,7 @@ def test__default_policy_ok(monkeypatch):
 def test__list_all_table_references_obj_path_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
+    _mock_bq_base_dataset(monkeypatch)
     # When
     result = list(sampler_bucket._list_all_table_references_obj_path(gcs_on_disk.POLICY_BUCKET))
     # Then
@@ -78,6 +93,7 @@ _MANDATORY_PRESENT_POLICIES: Set[str] = set(
 def test_all_policies_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
+    _mock_bq_base_dataset(monkeypatch)
     default_policy = sampler_bucket._default_policy(gcs_on_disk.POLICY_BUCKET, _GENERAL_POLICY_PATH)
     # When
     tables = set()
@@ -147,6 +163,7 @@ _REQUEST_HAS_SORT_ALGORITHM: Set[str] = set(
 def test_all_sample_requests_ok(monkeypatch):
     # Given
     _patch_gcs_storage(monkeypatch)
+    _mock_bq_base_dataset(monkeypatch)
     # When
     tables = set()
     for t_req in sampler_bucket.all_sample_requests(gcs_on_disk.REQUEST_BUCKET):

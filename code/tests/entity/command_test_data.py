@@ -4,8 +4,7 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-from bq_sampler.entity import command
-from bq_sampler.entity import table
+from bq_sampler.entity import command, table
 
 _TEST_POLICY_PREFIX: str = 'project_id_a/dataset_id_a'
 _TEST_SOURCE_PROJECT_ID: str = 'TEST_SOURCE_PROJECT_ID'

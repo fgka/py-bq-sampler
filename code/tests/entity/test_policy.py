@@ -5,15 +5,13 @@
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods
 # type: ignore
 import math
-
 from typing import Any
 
 import pytest
 
 import attrs
 
-from bq_sampler.entity import policy
-from bq_sampler.entity import table
+from bq_sampler.entity import policy, table
 
 from tests.entity import sample_policy_data
 

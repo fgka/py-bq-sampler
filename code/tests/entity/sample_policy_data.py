@@ -4,8 +4,7 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-from bq_sampler.entity import policy
-from bq_sampler.entity import table
+from bq_sampler.entity import policy, table
 
 
 TEST_SAMPLE_SIZE: table.SizeSpec = table.SizeSpec(count=17, percentage=11.1)
@@ -21,12 +20,13 @@ TEST_SAMPLE: table.Sample = table.Sample(size=TEST_SAMPLE_SIZE, spec=_TEST_SORT_
 _TEST_PROJECT_ID: str = 'TEST_PROJECT_ID'
 _TEST_DATASET_ID: str = 'TEST_DATASET_ID'
 _TEST_TABLE_ID: str = 'TEST_TABLE_ID'
-_TEST_LOCATION: str = 'TEST_REGION'
+TEST_SRC_LOCATION: str = 'TEST_SRC_REGION'
+TEST_TGT_LOCATION: str = 'TEST_TGT_REGION'
 TEST_TABLE_REFERENCE: table.TableReference = table.TableReference(
     project_id=_TEST_PROJECT_ID,
     dataset_id=_TEST_DATASET_ID,
     table_id=_TEST_TABLE_ID,
-    location=_TEST_LOCATION,
+    location=TEST_SRC_LOCATION,
 )
 TEST_POLICY: policy.Policy = policy.Policy(limit=TEST_SAMPLE_SIZE, default_sample=TEST_SAMPLE)
 TEST_TABLE_POLICY: policy.TablePolicy = policy.TablePolicy(

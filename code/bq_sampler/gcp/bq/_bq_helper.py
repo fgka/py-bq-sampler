@@ -7,15 +7,15 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 .. Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
-from typing import Callable, Dict, Generator, Optional
+import re
+from typing import Callable, Dict, Generator, Optional, Sequence
 
 import cachetools
 
-from google.cloud import bigquery
+from google.cloud import bigquery, bigquery_datatransfer
 
-from bq_sampler import const
+from bq_sampler import const, logger
 from bq_sampler.gcp.bq import _bq_base
-from bq_sampler import logger
 
 _LOGGER = logger.get(__name__)
 
@@ -78,14 +78,11 @@ def query_job_result(
     return result
 
 
-def drop_all_tables_by_labels(
-    *, project_id: str, location: Optional[str] = None, labels: Optional[Dict[str, str]] = None
-) -> None:
+def drop_all_tables_by_labels(*, project_id: str, labels: Optional[Dict[str, str]] = None) -> None:
     """
     Will list all tables and remove all that matches the label criteria.
 
     :param project_id:
-    :param location:
     :param labels:
     :return:
     """
@@ -95,9 +92,7 @@ def drop_all_tables_by_labels(
     # logic
     filter_fn = _has_table_labels_fn(labels)
     _drop_all_tables_in_iter(
-        _bq_base.list_all_tables_with_filter(
-            project_id=project_id, location=location, filter_fn=filter_fn
-        )
+        _bq_base.list_all_tables_with_filter(project_id=project_id, filter_fn=filter_fn)
     )
     _LOGGER.debug('Dropped all tables in project <%s> with labels <%s>', project_id, labels)
 
@@ -131,3 +126,79 @@ def _drop_all_tables_in_iter(tables_to_drop_gen: Generator[str, None, None]) -> 
             last_error = err
     if last_error is not None:
         raise RuntimeError('+++'.join(error_msgs)) from last_error
+
+
+def remove_all_empty_datasets_by_labels(
+    *, project_id: str, labels: Optional[Dict[str, str]] = None
+) -> None:
+    """
+    Will list all datasets and remove all that matches the label criteria and are empty.
+
+    :param project_id:
+    :param labels:
+    :return:
+    """
+    # validate input
+    _LOGGER.debug(
+        'Dropping all datasets empty in project <%s> with labels <%s>', project_id, labels
+    )
+    labels = _validate_table_labels(labels)
+    # logic
+    filter_fn = _has_table_labels_fn(labels)
+    _bq_base.remove_empty_datasets(project_id=project_id, filter_fn=filter_fn)
+    _LOGGER.debug('Dropped all datasets empty in project <%s> with labels <%s>', project_id, labels)
+
+
+def cross_location_copy(
+    *,
+    source_table_fqn_id: str,
+    target_table_fqn_id: str,
+    notification_pubsub_topic: Optional[str] = None,
+    bq_transfer_sa: Optional[str] = None,
+) -> Sequence[bigquery_datatransfer.TransferRun]:
+    """
+    Forces the py:class:`bigquery.job.query.QueryJob` to get the results
+        (works as a synchronization mechanism too).
+
+    :param source_table_fqn_id:
+    :param target_table_fqn_id:
+    :param notification_pubsub_topic:
+    :param bq_transfer_sa:
+    :return:
+    """
+    _LOGGER.debug(
+        'Issuing copy job results from <%s> into <%s> with done notification sent to <%s>',
+        source_table_fqn_id,
+        target_table_fqn_id,
+        notification_pubsub_topic,
+    )
+    try:
+        result = _bq_base.cross_location_dataset_copy(
+            source_table_fqn_id=source_table_fqn_id,
+            target_table_fqn_id=target_table_fqn_id,
+            notification_pubsub_topic=notification_pubsub_topic,
+            bq_transfer_sa=bq_transfer_sa,
+        )
+    except Exception as err:  # pylint: disable=broad-except
+        raise RuntimeError(
+            f'Could not retrieve results from dataset copy from <{source_table_fqn_id}> '
+            f'into <{target_table_fqn_id}> '
+            f'with notification sent to <{notification_pubsub_topic}>. '
+            f'Error: {err}'
+        ) from err
+    return result
+
+
+def bigquery_valid_string(
+    value: str,
+) -> str:
+    """
+    Compliance with BigQuery naming constraints:
+    * Only ASCII letters and digits, plus `_`;
+    * Up to 1024 characters long.
+
+    :param value:
+    :return:
+    """
+    result = re.sub(r'\W', '_', value, flags=re.ASCII)
+    return result[0:1023]

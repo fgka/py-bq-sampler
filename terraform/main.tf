@@ -3,6 +3,7 @@ locals {
   function_source_exclude = flatten([
     for in_file in var.function_bundle_exclude_list_files : split("\n", file(in_file))
   ])
+  bq_target_location         = var.bq_target_location != null ? var.bq_target_location : var.region
   notification_function_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}"
   notification_handler       = "${var.notification_function_handler_prefix}${lower(var.notification_function_type)}"
   // something like SMTP_CONFIG_URI="gs://my_policy_bucket/smtp_config.json"
@@ -37,9 +38,16 @@ module "sampler_service_account" {
     "${var.project_id}" = [
       "roles/pubsub.publisher",
       "roles/bigquery.dataViewer",
+      "roles/bigquerydatatransfer.serviceAgent",
       "roles/storage.objectViewer",
     ]
   }
+}
+
+resource "google_service_account_iam_member" "sampler_service_account_cross_project_token" {
+  service_account_id = module.sampler_service_account.id
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.target_project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
 }
 
 module "notification_function_service_account" {
@@ -55,6 +63,17 @@ module "notification_function_service_account" {
   }
 }
 
+module "cmd_pubsub_service_account" {
+  source       = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/iam-service-account"
+  project_id   = var.project_id
+  name         = var.pubsub_cmd_service_account_name
+  generate_key = false
+  iam_project_roles = {
+    "${var.project_id}" = [
+      "roles/cloudfunctions.invoker",
+    ]
+  }
+}
 // GCS //
 
 module "policy_bucket" {
@@ -100,26 +119,42 @@ module "sampler" {
     timeout     = var.sampler_function_timeout
   }
   environment_variables = {
-    BQ_LOCATION                = var.region
-    TARGET_PROJECT_ID          = var.target_project_id
-    POLICY_BUCKET_NAME         = module.policy_bucket.name
-    REQUEST_BUCKET_NAME        = module.request_bucket.name
-    DEFAULT_POLICY_OBJECT_PATH = var.default_policy_object_path
-    SAMPLING_LOCK_OBJECT_PATH  = var.sampling_lock_object_path
-    CMD_TOPIC_NAME             = module.pubsub_cmd.id
-    ERROR_TOPIC_NAME           = module.pubsub_err.id
-    LOG_LEVEL                  = var.sampler_function_log_level
+    BQ_TARGET_LOCATION             = local.bq_target_location
+    BQ_TRANSFER_NOTIFICATION_TOPIC = module.pubsub_bq_notification.id
+    BQ_TRANSFER_SA_EMAIL           = module.sampler_service_account.email
+    TARGET_PROJECT_ID              = var.target_project_id
+    POLICY_BUCKET_NAME             = module.policy_bucket.name
+    REQUEST_BUCKET_NAME            = module.request_bucket.name
+    DEFAULT_POLICY_OBJECT_PATH     = var.default_policy_object_path
+    SAMPLING_LOCK_OBJECT_PATH      = var.sampling_lock_object_path
+    CMD_TOPIC_NAME                 = module.pubsub_cmd.id
+    ERROR_TOPIC_NAME               = module.pubsub_err.id
+    LOG_LEVEL                      = var.sampler_function_log_level
   }
-  bucket_name = module.policy_bucket.name
-  bundle_config = {
+  trigger_config   = null // forces HTTP
+  ingress_settings = "ALLOW_ALL"
+  bucket_name      = module.policy_bucket.name
+  bundle_config    = {
     source_dir  = "../code"
     output_path = "dist/${var.sampler_function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
-  trigger_config = {
-    event    = "google.pubsub.topic.publish"
-    resource = module.pubsub_cmd.id
-    retry    = null
+}
+
+resource "google_pubsub_subscription" "pubsub_cmd_sampler" {
+  name = "${var.sampler_function_name}_http_cmd_push_subscription"
+  topic = module.pubsub_cmd.id
+  push_config {
+    push_endpoint = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.sampler_function_name}"
+    oidc_token {
+      service_account_email = module.cmd_pubsub_service_account.email
+      audience              = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.sampler_function_name}"
+    }
+  }
+  ack_deadline_seconds = var.sampler_function_timeout
+  message_retention_duration = "1200s" # 20 minutes
+  retry_policy {
+    minimum_backoff = "10s"
   }
 }
 
@@ -276,9 +311,40 @@ module "notification_secret" {
 
 // X-Project Permissions //
 
+
+resource "google_project_iam_binding" "project_iam_bq_transfer_pubsub" {
+  project = var.target_project_id
+  role    = "roles/pubsub.publisher"
+  members = [
+    "serviceAccount:service-${data.google_project.target_project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com",
+    "serviceAccount:${module.sampler_service_account.email}",
+  ]
+}
+
+resource "google_project_iam_binding" "project_iam_bq_transfer_agent" {
+  project = var.target_project_id
+  role    = "roles/bigquerydatatransfer.serviceAgent"
+  members = [
+    "serviceAccount:service-${data.google_project.target_project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com",
+    "serviceAccount:${module.sampler_service_account.email}",
+  ]
+}
+
 resource "google_project_iam_binding" "target_project_iam_bq_data" {
   project = var.target_project_id
-  role    = "roles/bigquery.dataEditor"
+  role    = "roles/bigquery.admin"
+  members = ["serviceAccount:${module.sampler_service_account.email}"]
+}
+
+resource "google_project_iam_binding" "target_project_iam_service_usage" {
+  project = var.target_project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  members = ["serviceAccount:${module.sampler_service_account.email}"]
+}
+
+resource "google_project_iam_binding" "target_project_iam_bq_data_transfer_token" {
+  project = var.target_project_id
+  role    = "roles/iam.serviceAccountTokenCreator"
   members = ["serviceAccount:${module.sampler_service_account.email}"]
 }
 
@@ -306,6 +372,30 @@ module "request_bucket" {
   }
 }
 
+// PubSub
+
+module "pubsub_bq_notification" {
+  source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/pubsub"
+  project_id = var.target_project_id
+  name       = var.pubsub_bq_notification_topic_name
+}
+
+resource "google_pubsub_subscription" "pubsub_bq_notification_sampler" {
+  name = "${var.sampler_function_name}_http_bq_notification_push_subscription"
+  topic = module.pubsub_bq_notification.id
+  push_config {
+    push_endpoint = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.sampler_function_name}"
+    oidc_token {
+      service_account_email = module.cmd_pubsub_service_account.email
+      audience              = "https://${var.region}-${var.project_id}.cloudfunctions.net/${var.sampler_function_name}"
+    }
+  }
+  ack_deadline_seconds = var.sampler_function_timeout
+  message_retention_duration = "1200s" # 20 minutes
+  retry_policy {
+    minimum_backoff = "10s"
+  }
+}
 
 //////////////////////
 // Integ Tests Data //

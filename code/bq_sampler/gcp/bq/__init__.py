@@ -5,14 +5,19 @@ Exposes all functionality related to BigQuery.
 
 from bq_sampler.gcp.bq._bq_base import (
     create_table,
-    cross_region_dataset_copy,
+    get_dataset,
     drop_table,
     list_all_tables_with_filter,
     query_job,
+    remove_dataset,
+    remove_transfer_config,
     table,
 )
 from bq_sampler.gcp.bq._bq_helper import (
+    bigquery_valid_string,
+    cross_location_copy,
     drop_all_tables_by_labels,
     query_job_result,
+    remove_all_empty_datasets_by_labels,
     row_count,
 )

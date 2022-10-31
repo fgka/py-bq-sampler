@@ -5,9 +5,9 @@ Reads an object from `Cloud Storage`_.
 
 .. Cloud Storage: https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/read-write-to-cloud-storage
 """
+# pylint: enable=line-too-long
 import logging
 
-# pylint: enable=line-too-long
 import re
 from typing import Any, Callable, Dict, Generator, Optional, Tuple
 

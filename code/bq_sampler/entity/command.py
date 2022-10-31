@@ -2,13 +2,12 @@
 """
 DTOs to encode a command coming from the Cloud Function.
 """
-from typing import Any
+from typing import Any, Dict
 
 import attrs
 
 from bq_sampler import const
-from bq_sampler.entity import attrs_defaults
-from bq_sampler.entity import table
+from bq_sampler.entity import attrs_defaults, table
 
 
 class CommandType(attrs_defaults.EnumWithFromStrIgnoreCase):
@@ -20,6 +19,8 @@ class CommandType(attrs_defaults.EnumWithFromStrIgnoreCase):
     SAMPLE_POLICY_PREFIX = const.REQUEST_TYPE_SAMPLE_POLICY_PREFIX
     SAMPLE_START = const.REQUEST_TYPE_SAMPLE_START
     SAMPLE_DONE = const.REQUEST_TYPE_SAMPLE_DONE
+    TRANSFER_RUN_DONE = const.REQUEST_TYPE_TRANSFER_RUN_DONE
+    REMOVE_DATASET = const.REQUEST_TYPE_REMOVE_DATASET
 
 
 @attrs.define(**const.ATTRS_DEFAULTS)
@@ -85,3 +86,23 @@ class CommandSampleDone(CommandSampleStart):  # pylint: disable=too-few-public-m
     amount_inserted: int = attrs.field(
         default=None, validator=attrs.validators.optional(attrs.validators.ge(0))
     )
+
+
+@attrs.define(**const.ATTRS_DEFAULTS)
+class CommandTransferRunDone(CommandBase):  # pylint: disable=too-few-public-methods
+    """
+    To inform a specific BigQuery transfer run is finished
+    """
+
+    name: str = attrs.field(validator=attrs.validators.instance_of(str))
+    payload: Dict[str, Any] = attrs.field(validator=attrs.validators.instance_of(dict))
+
+
+@attrs.define(**const.ATTRS_DEFAULTS)
+class CommandRemoveDataset(CommandBase):  # pylint: disable=too-few-public-methods
+    """
+    To request the removal a specific BigQuery dataset
+    """
+
+    project_id: str = attrs.field(validator=attrs.validators.instance_of(str))
+    dataset_id: str = attrs.field(validator=attrs.validators.instance_of(str))
