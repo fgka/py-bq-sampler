@@ -14,7 +14,7 @@ import cachetools
 from google.api_core import page_iterator
 from google import auth
 from google.cloud import bigquery, bigquery_datatransfer
-from google.protobuf import struct_pb2, timestamp_pb2
+from google.protobuf import field_mask_pb2, struct_pb2, timestamp_pb2
 
 from bq_sampler import const, logger
 
@@ -399,17 +399,10 @@ def _list_all_tables_with_filter(
     _LOGGER.debug('Listing all tables in project <%s> with filter function', project_id)
     try:
         for ds_list_item in _list_all_datasets(project_id):
+            table_location = _extract_location_from_ds_list_item(ds_list_item)
             for t_list_item in _list_all_tables_in_dataset(ds_list_item):
                 if filter_fn(t_list_item):
-                    table_fqn_id = const.BQ_TABLE_FQN_ID_SEP.join(
-                        [project_id, ds_list_item.dataset_id, t_list_item.table_id]
-                    )
-                    table_location = _extract_location_from_ds_list_item(ds_list_item)
-                    if table_location:
-                        table_fqn_id = (
-                            f'{table_fqn_id}{const.BQ_TABLE_FQN_LOCATION_SEP}{table_location}'
-                        )
-                    yield table_fqn_id
+                    yield _table_fqn_from_table_ref(t_list_item, table_location)
     except Exception as err:  # pylint: disable=broad-except
         raise ValueError(
             f'Could not list all datasets in project <{project_id}>. Error: {err}'
@@ -434,6 +427,26 @@ def _list_all_datasets(project_id: str) -> page_iterator.Iterator:
     return result
 
 
+def _list_all_tables_in_dataset(
+    dataset_ref: Union[bigquery.DatasetReference, bigquery.dataset.DatasetListItem],
+) -> page_iterator.Iterator:
+    # pylint: disable=line-too-long
+    """
+    Page iterator over :py:class:`bigquery.table.TableListItem` (`documentation`_)
+
+    .. _documentation: https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.table.TableListItem
+    """
+    # pylint: enable=line-too-long
+    _LOGGER.debug('Listing all tables in dataset <%s>', dataset_ref.dataset_id)
+    try:
+        result = _client(dataset_ref.project).list_tables(dataset_ref)
+    except Exception as err:  # pylint: disable=broad-except
+        raise ValueError(
+            f'Could not list all tables in dataset <{dataset_ref.dataset_id}>. Error: {err}'
+        ) from err
+    return result
+
+
 _DATASET_LIST_ITEM_PROPERTIES_ATTR: str = '_properties'
 _DATASET_LIST_ITEM_PROPERTIES_LOCATION_ATTR: str = 'location'
 
@@ -452,23 +465,10 @@ def _extract_location_from_ds_list_item(value: bigquery.dataset.DatasetListItem)
     return result
 
 
-def _list_all_tables_in_dataset(
-    dataset_list_item: Union[bigquery.DatasetReference, bigquery.dataset.DatasetListItem],
-) -> page_iterator.Iterator:
-    # pylint: disable=line-too-long
-    """
-    Page iterator over :py:class:`bigquery.table.TableListItem` (`documentation`_)
-
-    .. _documentation: https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.table.TableListItem
-    """
-    # pylint: enable=line-too-long
-    _LOGGER.debug('Listing all tables in dataset <%s>', dataset_list_item.dataset_id)
-    try:
-        result = _client(dataset_list_item.project).list_tables(dataset_list_item)
-    except Exception as err:  # pylint: disable=broad-except
-        raise ValueError(
-            f'Could not list all tables in dataset <{dataset_list_item.dataset_id}>. Error: {err}'
-        ) from err
+def _table_fqn_from_table_ref(value: bigquery.table.TableListItem, location: str) -> str:
+    result = const.BQ_TABLE_FQN_ID_SEP.join([value.project, value.dataset_id, value.table_id])
+    if location:
+        result = f'{result}{const.BQ_TABLE_FQN_LOCATION_SEP}{location}'
     return result
 
 
@@ -485,7 +485,7 @@ def get_dataset(project_id: str, dataset_id: str) -> bigquery.Dataset:
     dataset_id = _stripped_str_arg('dataset_id', dataset_id)
     # logic
     try:
-        result = _client().get_dataset(
+        result = _client(project_id).get_dataset(
             bigquery.DatasetReference(project=project_id, dataset_id=dataset_id)
         )
     except Exception as err:
@@ -517,11 +517,13 @@ def remove_empty_datasets(
     for dataset_item in _list_all_datasets(project_id):
         if filter_fn(dataset_item):
             try:
-                remove_dataset(
-                    project_id=dataset_item.project,
-                    dataset_id=dataset_item.dataset_id,
-                    only_if_empty=True,
-                )
+                if _is_dataset_empty(dataset_item):
+                    remove_dataset(
+                        project_id=dataset_item.project,
+                        dataset_id=dataset_item.dataset_id,
+                        delete_contents=False,
+                        not_found_ok=True,
+                    )
             except Exception as err:  # pylint: disable=broad-except
                 msg = f'Could remove {dataset_item.full_dataset_id}. Error: {err}'
                 _LOGGER.error(msg)
@@ -530,12 +532,16 @@ def remove_empty_datasets(
         raise RuntimeError(f'Could not remove dataset(s). Errors: {errors}') from errors[-1]
 
 
+def _is_dataset_empty(dataset_ref: bigquery.DatasetReference) -> bool:
+    return next(_list_all_tables_in_dataset(dataset_ref), None) is None
+
+
 def remove_dataset(
     *,
     project_id: str,
     dataset_id: str,
     not_found_ok: Optional[bool] = True,
-    only_if_empty: Optional[bool] = False,
+    delete_contents: Optional[bool] = False,
 ) -> None:
     """
     Removes a dataset.
@@ -543,27 +549,40 @@ def remove_dataset(
     :param project_id:
     :param dataset_id:
     :param not_found_ok:
-    :param only_if_empty:
+    :param delete_contents:
     :return:
     """
-    _LOGGER.debug('Removing dataset <%s> in project <%s>', dataset_id, project_id)
+    _LOGGER.debug(
+        'Removing dataset <%s> in project <%s> with table removal set to %s',
+        dataset_id,
+        project_id,
+        delete_contents,
+    )
     # validate input
     project_id = _stripped_str_arg('project_id', project_id)
     dataset_id = _stripped_str_arg('dataset_id', dataset_id)
     # logic
-    to_remove = not only_if_empty
-    if only_if_empty:
-        dataset_ref = bigquery.DatasetReference(project=project_id, dataset_id=dataset_id)
-        page_iter = _list_all_tables_in_dataset(dataset_ref)
-        if page_iter and page_iter.num_results == 0:
-            to_remove = True
-    if to_remove:
-        _remove_dataset(project_id=project_id, dataset_id=dataset_id, not_found_ok=not_found_ok)
-        _LOGGER.debug('Removed dataset <%s> in project <%s>', dataset_id, project_id)
+    # remove dataset
+    _remove_dataset(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        delete_contents=delete_contents,
+        not_found_ok=not_found_ok,
+    )
+    _LOGGER.info(
+        'Removed dataset <%s> in project <%s> with table removal set to %s',
+        dataset_id,
+        project_id,
+        delete_contents,
+    )
 
 
 def _remove_dataset(
-    *, project_id: str, dataset_id: str, not_found_ok: Optional[bool] = True
+    *,
+    project_id: str,
+    dataset_id: str,
+    delete_contents: Optional[bool] = False,
+    not_found_ok: Optional[bool] = True,
 ) -> None:
     _LOGGER.debug(
         'Removing dataset <%s> in project <%s> with not_found_ok <%s>',
@@ -575,13 +594,15 @@ def _remove_dataset(
     try:
         client.delete_dataset(
             dataset=bigquery.DatasetReference(project=project_id, dataset_id=dataset_id),
+            delete_contents=delete_contents,
             not_found_ok=not_found_ok,
         )
         _LOGGER.info(
-            'Removed dataset <%s> in project <%s> with not_found_ok <%s>',
+            'Removed dataset <%s> in project <%s> with not_found_ok <%s> and delete contents <%s>',
             dataset_id,
             project_id,
             not_found_ok,
+            delete_contents,
         )
     except Exception as err:  # pylint: disable=broad-except
         raise RuntimeError(
@@ -589,12 +610,12 @@ def _remove_dataset(
         ) from err
 
 
-def cross_location_dataset_copy(
+def dataset_transfer_config_run(
     *,
     source_table_fqn_id: str,
     target_table_fqn_id: str,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
+    transfer_config_display_name_prefix: Optional[str] = None,
 ) -> Sequence[bigquery_datatransfer.TransferRun]:
     # pylint: disable=line-too-long
     """
@@ -605,7 +626,8 @@ def cross_location_dataset_copy(
     :param source_table_fqn_id:
     :param target_table_fqn_id:
     :param notification_pubsub_topic:
-    :param bq_transfer_sa:
+    :param transfer_config_display_name_prefix: if :py:obj:`None`
+      uses :py:data:`const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX`.
     :return:
 
     .. DataTransferServiceClient: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient
@@ -627,38 +649,51 @@ def cross_location_dataset_copy(
     )
     # create transfer config
     client = _data_transfer_client(tgt_tbl.project_id)
-    transfer_config_request = _create_transfer_config_request(
+    create_transfer_config_request = _create_transfer_config_request(
         source_table=src_tbl,
         target_table=tgt_tbl,
-        notification_pubsub_topic=notification_pubsub_topic,
-        bq_transfer_sa=bq_transfer_sa,
+        transfer_config_display_name_prefix=transfer_config_display_name_prefix,
     )
     try:
-        create_response: bigquery_datatransfer.TransferConfig = client.create_transfer_config(
-            request=transfer_config_request,
+        transfer_config: bigquery_datatransfer.TransferConfig = client.create_transfer_config(
+            request=create_transfer_config_request,
         )
     except Exception as err:  # pylint: disable=broad-except
-        str_transfer_config_request = str(transfer_config_request).replace('\n', '\\n')
+        str_transfer_config_request = str(create_transfer_config_request).replace('\n', '\\n')
         raise RuntimeError(
             f'Could not create transfer config with request <{str_transfer_config_request}> '
             f'Error: {err}'
         ) from err
+    if notification_pubsub_topic:
+        update_transfer_config_request = _update_transfer_config_request(
+            transfer_config=transfer_config, notification_pubsub_topic=notification_pubsub_topic
+        )
+        try:
+            transfer_config: bigquery_datatransfer.TransferConfig = client.update_transfer_config(
+                request=update_transfer_config_request
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            str_transfer_config_request = str(update_transfer_config_request).replace('\n', '\\n')
+            raise RuntimeError(
+                f'Could not update transfer config with request <{str_transfer_config_request}> '
+                f'Error: {err}'
+            ) from err
     _LOGGER.info(
         'Created BigQuery %s from <%s> to <%s>. Transfer name: %s',
         bigquery_datatransfer.TransferConfig.__name__,
         src_tbl,
         tgt_tbl,
-        create_response.name,
+        transfer_config.name,
     )
     # manually trigger the transfer run
-    transfer_run_request = _create_transfer_run_request(name=create_response.name)
+    transfer_run_request = _create_transfer_run_request(name=transfer_config.name)
     try:
         run_response: bigquery_datatransfer.StartManualTransferRunsResponse = (
             client.start_manual_transfer_runs(request=transfer_run_request)
         )
     except Exception as err:  # pylint: disable=broad-except
         raise RuntimeError(
-            f'Could not manually start run {create_response.name} '
+            f'Could not manually start run {transfer_config.name} '
             f'with request <{transfer_run_request}> '
             f'Error: {err}'
         ) from err
@@ -666,7 +701,7 @@ def cross_location_dataset_copy(
     _LOGGER.info(
         'Triggered %s: %s with runs: [%s]',
         bigquery_datatransfer.TransferConfig.__name__,
-        create_response.name,
+        transfer_config.name,
         ', '.join([run.name for run in result]),
     )
     # return the runs
@@ -702,37 +737,62 @@ def _create_transfer_config_request(
     *,
     source_table: _SimpleTableSpec,
     target_table: _SimpleTableSpec,
-    notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
+    transfer_config_display_name_prefix: Optional[str] = None,
 ) -> bigquery_datatransfer.CreateTransferConfigRequest:
+    # pylint: disable=line-too-long
     """
-        Equivalent to::
-            bq mk --transfer_config \
-                --data_source=cross_region_copy \
-                --project_id=<TARGET_PROJECT_ID> \
-                --target_dataset=<TARGET_DATASET_ID> \
-                --display_name=<TARGET_DATASET_ID> \
-                --notification_pubsub_topic=<PUBSUB_TOPIC> \
-                --params='{
-                    "source_project_id":"<SOURCE_PROJECT_ID>",
-                    "source_dataset_id":"<SOURCE_DATASET_ID>",
-                    "overwrite_destination_table":"true"
-                }'
+    See :py:class:`bigquery_datatransfer.CreateTransferConfigRequest` `documentation`_.
+
+    Equivalent to::
+        bq mk --transfer_config \
+            --data_source=cross_region_copy \
+            --project_id=<TARGET_PROJECT_ID> \
+            --target_dataset=<TARGET_DATASET_ID> \
+            --display_name=<TARGET_DATASET_ID> \
+            --notification_pubsub_topic=<PUBSUB_TOPIC> \
+            --params='{
+                "source_project_id":"<SOURCE_PROJECT_ID>",
+                "source_dataset_id":"<SOURCE_DATASET_ID>",
+                "overwrite_destination_table":"true"
+            }'
+
+    .. documentation: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.types.CreateTransferConfigRequest
     """
-    transfer_config = bigquery_datatransfer.TransferConfig(
-        display_name=f'Cross-region tansfer {target_table}',
+    # pylint: enable=line-too-long
+    if transfer_config_display_name_prefix is None:
+        transfer_config_display_name_prefix = const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX
+    transfer_config = _transfer_config(
+        transfer_config_display_name=f'{transfer_config_display_name_prefix}{target_table}',
+        source_project_id=source_table.project_id,
+        source_dataset_id=source_table.dataset_id,
+        target_dataset_id=target_table.dataset_id,
+    )
+    return bigquery_datatransfer.CreateTransferConfigRequest(
+        parent=f'projects/{target_table.project_id}/locations/{target_table.location}',
+        transfer_config=transfer_config,
+    )
+
+
+def _transfer_config(
+    *,
+    transfer_config_display_name: str,
+    source_project_id: str,
+    source_dataset_id: str,
+    target_dataset_id: str,
+) -> bigquery_datatransfer.TransferConfig:
+    return bigquery_datatransfer.TransferConfig(
+        display_name=transfer_config_display_name,
         data_source_id=_DATA_TRANSFER_DATA_SOURCE_ID,
-        destination_dataset_id=target_table.dataset_id,
+        destination_dataset_id=target_dataset_id,
         data_refresh_window_days=0,
         schedule_options=bigquery_datatransfer.ScheduleOptions(disable_auto_scheduling=True),
-        notification_pubsub_topic=notification_pubsub_topic,
         params=struct_pb2.Struct(  # pylint: disable=no-member
             fields=dict(
                 source_project_id=struct_pb2.Value(  # pylint: disable=no-member
-                    string_value=source_table.project_id
+                    string_value=source_project_id
                 ),
                 source_dataset_id=struct_pb2.Value(  # pylint: disable=no-member
-                    string_value=source_table.dataset_id
+                    string_value=source_dataset_id
                 ),
                 overwrite_destination_table=struct_pb2.Value(  # pylint: disable=no-member
                     bool_value=True
@@ -740,10 +800,32 @@ def _create_transfer_config_request(
             )
         ),
     )
-    return bigquery_datatransfer.CreateTransferConfigRequest(
-        parent=f'projects/{target_table.project_id}',
+
+
+def _update_transfer_config_request(
+    *,
+    transfer_config: bigquery_datatransfer.TransferConfig,
+    notification_pubsub_topic: Optional[str] = None,
+) -> bigquery_datatransfer.UpdateTransferConfigRequest:
+    # pylint: disable=line-too-long
+    """
+    See :py:class:`bigquery_datatransfer.CreateTransferConfigRequest` `documentation`_.
+
+    :param transfer_config:
+    :param notification_pubsub_topic:
+    :return:
+    .. documentation: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.types.UpdateTransferConfigRequest
+    """
+    # pylint: enable=line-too-long
+    transfer_config.notification_pubsub_topic = notification_pubsub_topic
+    # pylint: disable=no-member
+    update_mask: field_mask_pb2.FieldMask = field_mask_pb2.FieldMask(
+        paths=[const.TRANSFER_CONFIG_UPDATE_MASK_NOTIFICATION_PUBSUB_TOPIC]
+    )
+    # pylint: enable=no-member
+    return bigquery_datatransfer.UpdateTransferConfigRequest(
         transfer_config=transfer_config,
-        service_account_name=bq_transfer_sa,
+        update_mask=update_mask,
     )
 
 
@@ -767,6 +849,58 @@ def _create_transfer_run_request(
     )
 
 
+def list_transfer_config_by_display_name_prefix(
+    *, project_id: str, location: str, prefix: Optional[str] = None
+) -> Generator[bigquery_datatransfer.TransferConfig, None, None]:
+    """
+    Lists all :py:class:`bigquery_datatransfer.TransferConfig` in `project_id`
+      and whose display name starts with `prefix`.
+
+    :param project_id:
+    :param location:
+    :param prefix: if :py:obj:`None` uses :py:data:`const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX`.
+    :return:
+    """
+    _LOGGER.debug('Listing transfer config for project <%s> and prefix: <%s>', project_id, prefix)
+    # validation
+    if not isinstance(project_id, str) or not project_id:
+        raise ValueError(
+            f'Project ID is mandatory and needs to be a non-empty {str.__name__}. '
+            f'Got: <{project_id}>({type(project_id)})'
+        )
+    if not isinstance(location, str) or not location:
+        raise ValueError(
+            f'Location is mandatory and needs to be a non-empty {str.__name__}. '
+            f'Got: <{project_id}>({type(project_id)})'
+        )
+    if not isinstance(prefix, str):
+        prefix = const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX
+    # logic
+    parent = f'projects/{project_id}/locations/{location}'
+    request = bigquery_datatransfer.ListTransferConfigsRequest(parent=parent)
+    _LOGGER.debug(
+        'Issuing list request for transfer config with actual prefix <%s>. Request: %s',
+        prefix,
+        str(prefix).replace('\n', '\\n'),
+    )
+    client = _data_transfer_client(project_id)
+    try:
+        for t_config_resp in client.list_transfer_configs(request=request).pages:
+            for t_config in t_config_resp.transfer_configs:
+                if t_config.display_name.startswith(prefix):
+                    _LOGGER.debug(
+                        'Found transfer config for prefix <%s> in <%s>. Item: %s',
+                        prefix,
+                        project_id,
+                        str(t_config).replace('\n', '\\n'),
+                    )
+                    yield t_config
+    except Exception as err:  # pylint: disable=broad-except
+        raise RuntimeError(
+            f'Could not list transfer configs in request {request}. Error: {err}'
+        ) from err
+
+
 def remove_transfer_config(name: str) -> None:
     """
     Removes a transfer config by name.
@@ -777,17 +911,18 @@ def remove_transfer_config(name: str) -> None:
     _LOGGER.debug('Removing transfer config <%s>', name)
     # validated input
     name = _stripped_str_arg('name', name)
-    name_match = const.TRANSFER_CONFIG_NAME_RE.match(name)
+    name_match = const.TRANSFER_CONFIG_RESOURCE_NAME_RE.match(name)
     if not name_match:
         raise ValueError(
             f'Transfer config name <{name}> '
-            f'does not match rule in <{const.TRANSFER_CONFIG_NAME_RE}>'
+            f'does not match rule in <{const.TRANSFER_CONFIG_RESOURCE_NAME_RE}>'
         )
     # logic
-    project_id = name_match.group(0)
+    project_id = name_match.group(1)
     request = bigquery_datatransfer.DeleteTransferConfigRequest(name=name)
     client = _data_transfer_client(project_id)
     try:
         client.delete_transfer_config(request=request)
-    except Exception as err:
+        _LOGGER.info('Removed transfer config: %s', name)
+    except Exception as err:  # pylint: disable=broad-except
         raise RuntimeError(f'Could not remove transfer config {name}. Error: {err}') from err

@@ -289,6 +289,21 @@ def remove_all_empty_sample_datasets(
     bq.remove_all_empty_datasets_by_labels(project_id=project_id, labels=labels)
 
 
+def remove_all_transfer_config(
+    *,
+    project_id: str,
+    location: str,
+) -> None:
+    """
+    Just a wrapper for :py:func:`bq.remove_all_transfer_config_by_display_name_prefix`.
+
+    :param project_id:
+    :param location:
+    :return:
+    """
+    bq.remove_all_transfer_config_by_display_name_prefix(project_id=project_id, location=location)
+
+
 def create_table_with_random_sample(
     *,
     source_table_ref: table.TableReference,
@@ -296,7 +311,6 @@ def create_table_with_random_sample(
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
@@ -308,7 +322,6 @@ def create_table_with_random_sample(
     :param amount:
     :param labels:
     :param notification_pubsub_topic:
-    :param bq_transfer_sa:
     :param recreate_table: if :py:obj:`True` (default) will drop the table prior to create it.
         If the table does not exist, it will ignore the drop.
     :return: amount of rows inserted
@@ -324,7 +337,6 @@ def create_table_with_random_sample(
         amount=amount,
         labels=labels,
         notification_pubsub_topic=notification_pubsub_topic,
-        bq_transfer_sa=bq_transfer_sa,
         recreate_table=recreate_table,
     )
 
@@ -365,7 +377,6 @@ def _create_table_with_random_sample(
     amount: int,
     labels: Optional[Dict[str, str]] = None,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     # setup
@@ -397,7 +408,6 @@ def _create_table_with_random_sample(
             staging_target_table_ref=staging_target_table_ref,
             target_table_ref=target_table_ref,
             notification_pubsub_topic=notification_pubsub_topic,
-            bq_transfer_sa=bq_transfer_sa,
         )
     return row_count(target_table_ref)
 
@@ -469,7 +479,7 @@ def _staging_dataset_id(
     target_table_ref: table.TableReference,
 ) -> str:
     return bq.bigquery_valid_string(
-        f'{target_table_ref.dataset_id[0:200]}_temp'
+        f'{const.TRANSFER_TEMP_DATASET_NAME_PREFIX}{target_table_ref.dataset_id[0:200]}'
         f'_{target_table_ref.table_id[0:200]}'
         f'_{source_table_ref.location[0:200]}'
         f'_{uuid.uuid4()}'
@@ -482,7 +492,6 @@ def _sample_query_execution(
     staging_target_table_ref: table.TableReference,
     target_table_ref: table.TableReference,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
 ) -> None:
     bq.query_job_result(
         query=query,
@@ -495,7 +504,6 @@ def _sample_query_execution(
             source_table_ref=staging_target_table_ref,
             target_table_ref=target_table_ref,
             notification_pubsub_topic=notification_pubsub_topic,
-            bq_transfer_sa=bq_transfer_sa,
         )
 
 
@@ -504,7 +512,6 @@ def _transfer_content_x_location(
     source_table_ref: table.TableReference,
     target_table_ref: table.TableReference,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
 ) -> None:
     if source_table_ref.location != target_table_ref.location:
         # A transfer needs to happen
@@ -512,7 +519,6 @@ def _transfer_content_x_location(
             source_table_fqn_id=source_table_ref.table_fqn_id(),
             target_table_fqn_id=target_table_ref.table_fqn_id(),
             notification_pubsub_topic=notification_pubsub_topic,
-            bq_transfer_sa=bq_transfer_sa,
         )
 
 
@@ -525,7 +531,6 @@ def create_table_with_sorted_sample(
     order: str,
     labels: Optional[Dict[str, str]] = None,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
@@ -539,7 +544,6 @@ def create_table_with_sorted_sample(
     :param order:
     :param labels:
     :param notification_pubsub_topic:
-    :param bq_transfer_sa:
     :param recreate_table:
     :return: amount of rows inserted
     """
@@ -558,7 +562,6 @@ def create_table_with_sorted_sample(
         order=order,
         labels=labels,
         notification_pubsub_topic=notification_pubsub_topic,
-        bq_transfer_sa=bq_transfer_sa,
         recreate_table=recreate_table,
     )
 
@@ -572,7 +575,6 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
     order: str,
     labels: Optional[Dict[str, str]] = None,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
     recreate_table: Optional[bool] = True,
 ) -> int:
     # setup
@@ -602,6 +604,5 @@ def _create_table_with_sorted_sample(  # pylint: disable=too-many-arguments
             staging_target_table_ref=staging_target_table_ref,
             target_table_ref=target_table_ref,
             notification_pubsub_topic=notification_pubsub_topic,
-            bq_transfer_sa=bq_transfer_sa,
         )
     return row_count(target_table_ref)

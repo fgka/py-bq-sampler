@@ -18,7 +18,6 @@ _BQ_TARGET_LOCATION_ENV_VAR: str = 'BQ_TARGET_LOCATION'  # europe-west3
 _BQ_TRANSFER_NOTIFICATION_TOPIC_ENV_VAR: str = (
     'BQ_TRANSFER_NOTIFICATION_TOPIC'  # projects/py-project-12345/topics/bq-notification-topic-name
 )
-_BQ_TRANSFER_SA_EMAIL_ENV_VAR: str = 'BQ_TRANSFER_SA_EMAIL'
 _BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default_policy.json
@@ -47,7 +46,6 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         self._pubsub_request = os.environ.get(_PUBSUB_CMD_TOPIC_ENV_VAR)
         self._pubsub_error = os.environ.get(_PUBSUB_ERROR_TOPIC_ENV_VAR)
         self._pubsub_bq_notification = os.environ.get(_BQ_TRANSFER_NOTIFICATION_TOPIC_ENV_VAR)
-        self._bq_transfer_sa = os.environ.get(_BQ_TRANSFER_SA_EMAIL_ENV_VAR)
         self._sampling_lock_path = os.environ.get(
             _SAMPLING_LOCK_OBJECT_PATH_ENV_VAR, _DEFAULT_SAMPLING_LOCK_OBJECT_PATH
         )
@@ -83,10 +81,6 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
     @property
     def pubsub_bq_notification(self) -> str:  # pylint: disable=missing-function-docstring
         return self._pubsub_bq_notification
-
-    @property
-    def bq_transfer_sa(self) -> str:  # pylint: disable=missing-function-docstring
-        return self._bq_transfer_sa
 
     @property
     def sampling_lock_path(self) -> str:  # pylint: disable=missing-function-docstring
@@ -157,9 +151,9 @@ def _process_start(value: command.CommandStart) -> None:
 
 
 def _process_start_ok(value: command.CommandStart) -> None:
-    _LOGGER.debug('Dropping all sample tables in <%s>', _general_config().target_project_id)
-    sampler_query.drop_all_sample_tables(project_id=_general_config().target_project_id)
-    sampler_query.remove_all_empty_sample_datasets(project_id=_general_config().target_project_id)
+    _clean_up_project_before_start(
+        project_id=_general_config().target_project_id, location=_general_config().target_location
+    )
 
     def prefix_filter_fn(full_path: str) -> bool:
         return len(full_path.strip(const.GS_PREFIX_DELIM).split(const.GS_PREFIX_DELIM)) == 2
@@ -172,6 +166,14 @@ def _process_start_ok(value: command.CommandStart) -> None:
         sample_policy_prefix_req = _create_sample_policy_prefix_cmd(value, prefix)
         # send request out
         _publish_cmd_to_pubsub(sample_policy_prefix_req)
+
+
+def _clean_up_project_before_start(project_id: str, location: str) -> None:
+    _LOGGER.debug('Cleaning up before start targeting project <%s>', project_id)
+    sampler_query.drop_all_sample_tables(project_id=project_id)
+    sampler_query.remove_all_empty_sample_datasets(project_id=project_id)
+    sampler_query.remove_all_transfer_config(project_id=project_id, location=location)
+    _LOGGER.info('Project <%s> cleaned up for start', project_id)
 
 
 def _create_sample_policy_prefix_cmd(
@@ -293,8 +295,7 @@ def _process_sample_start(value: command.CommandSampleStart) -> None:
         source_table_ref=value.sample_request.table_reference,
         target_table_ref=value.target_table,
         amount=value.sample_request.sample.size.count,
-        # notification_pubsub_topic=_general_config().pubsub_bq_notification,
-        # bq_transfer_sa=_general_config().bq_transfer_sa,
+        notification_pubsub_topic=_general_config().pubsub_bq_notification,
         recreate_table=True,
     )
     amount_inserted = 0
@@ -384,7 +385,7 @@ def _process_transfer_run_done(value: command.CommandTransferRunDone) -> None:
     bq.remove_transfer_config(value.name)
     # send remove dataset command
     project_id, dataset_id = _extract_source_dataset_from_transfer_run_payload(value.payload)
-    remove_dataset = _create_remove_dataset_cmd(project_id, dataset_id)
+    remove_dataset = _create_remove_dataset_cmd(project_id, dataset_id, value.timestamp)
     pubsub.publish(remove_dataset.as_dict(), _general_config().pubsub_request)
 
 
@@ -429,9 +430,12 @@ def _extract_source_dataset_from_transfer_run_payload(payload: Dict[str, Any]) -
     return project_id, dataset_id
 
 
-def _create_remove_dataset_cmd(project_id: str, dataset_id: str) -> command.CommandRemoveDataset:
+def _create_remove_dataset_cmd(
+    project_id: str, dataset_id: str, timestamp: int
+) -> command.CommandRemoveDataset:
     kwargs = {
         command.CommandRemoveDataset.type.__name__: command.CommandType.REMOVE_DATASET.value,
+        command.CommandRemoveDataset.timestamp.__name__: timestamp,
         command.CommandRemoveDataset.project_id.__name__: project_id,
         command.CommandRemoveDataset.dataset_id.__name__: dataset_id,
     }
@@ -446,7 +450,9 @@ def _process_remove_dataset(value: command.CommandRemoveDataset) -> None:
     :return:
     """
     _LOGGER.info('Removing dataset <%s>', value)
-    bq.remove_dataset(project_id=value.project_id, dataset_id=value.dataset_id)
+    bq.remove_dataset(
+        project_id=value.project_id, dataset_id=value.dataset_id, delete_contents=True
+    )
 
 
 def _process_sample_done(value: command.CommandSampleDone) -> None:

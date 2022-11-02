@@ -2,7 +2,7 @@
 """
 Parses a dictionary into an instance of :py:class:`command: command.CommandBase`.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from bq_sampler.entity import command
 from bq_sampler import const, logger
@@ -19,18 +19,20 @@ def to_command(value: Dict[str, Any], timestamp: int) -> command.CommandBase:
     :param timestamp:
     :return:
     """
+    _LOGGER.debug(
+        'Converting value into a %s instance with timestamp %s. Value: %s',
+        command.CommandBase.__name__,
+        timestamp,
+        value,
+    )
     # validate input
-    if not isinstance(value, dict):
-        raise TypeError(f'Expecting a {dict.__name__} as argument. Got: <{value}>({type(value)})')
-    req_type = command.CommandType.from_str(value.get(command.CommandBase.type.__name__))
+    req_type = _validate_command_dict_and_get_request_type(value)
     if not req_type:
         # see if it is a transfer notification
         value_new = _from_transfer_run_notification(value)
-        if req_type is None:
-            raise ValueError(f'Cannot create command of type <{req_type}> in argument <{value}>')
-        # rewrite value
-        value = value_new
-        req_type = command.CommandType.from_str(value.get(command.CommandBase.type.__name__))
+        req_type = _validate_command_dict_and_get_request_type(value_new)
+        if req_type:
+            value = value_new
     if not isinstance(timestamp, int) or timestamp <= 0:
         raise ValueError(
             f'Timestamp must be a positive {int.__name__}. Got <{timestamp}>({type(timestamp)})'
@@ -54,7 +56,13 @@ def to_command(value: Dict[str, Any], timestamp: int) -> command.CommandBase:
     return result
 
 
-def _from_transfer_run_notification(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _validate_command_dict_and_get_request_type(value: Dict[str, Any]) -> command.CommandType:
+    if not isinstance(value, dict):
+        raise TypeError(f'Expecting a {dict.__name__} as argument. Got: <{value}>({type(value)})')
+    return command.CommandType.from_str(value.get(command.CommandBase.type.__name__))
+
+
+def _from_transfer_run_notification(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # pylint: disable=line-too-long
     """
     Example payload::
@@ -84,6 +92,11 @@ def _from_transfer_run_notification(payload: Dict[str, Any]) -> Dict[str, Any]:
     :return:
     """
     # pylint: enable=line-too-long
+    _LOGGER.debug(
+        'Converting payload into %s command. Payload: %s',
+        command.CommandType.TRANSFER_RUN_DONE.value,
+        payload,
+    )
     result = None
     run_name = payload.get(const.TRANSFER_RUN_NAME_ATTR)
     data_source_id = payload.get('dataSourceId')
@@ -94,8 +107,14 @@ def _from_transfer_run_notification(payload: Dict[str, Any]) -> Dict[str, Any]:
             # pylint: disable=line-too-long
             result = {
                 command.CommandTransferRunDone.type.__name__: command.CommandType.TRANSFER_RUN_DONE.value,
-                command.CommandTransferRunDone.name.__name__: name_match.group(0),
+                command.CommandTransferRunDone.name.__name__: name_match.group(1),
                 command.CommandTransferRunDone.payload.__name__: payload,
             }
             # pylint: enable=line-too-long
+    else:
+        _LOGGER.debug(
+            'Could not convert payload into %s command. Payload: %s',
+            command.CommandType.TRANSFER_RUN_DONE.value,
+            payload,
+        )
     return result
