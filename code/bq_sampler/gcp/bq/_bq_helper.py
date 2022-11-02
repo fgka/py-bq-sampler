@@ -154,7 +154,7 @@ def cross_location_copy(
     source_table_fqn_id: str,
     target_table_fqn_id: str,
     notification_pubsub_topic: Optional[str] = None,
-    bq_transfer_sa: Optional[str] = None,
+    transfer_config_display_name_prefix: Optional[str] = None,
 ) -> Sequence[bigquery_datatransfer.TransferRun]:
     """
     Forces the py:class:`bigquery.job.query.QueryJob` to get the results
@@ -163,7 +163,8 @@ def cross_location_copy(
     :param source_table_fqn_id:
     :param target_table_fqn_id:
     :param notification_pubsub_topic:
-    :param bq_transfer_sa:
+    :param transfer_config_display_name_prefix: if :py:obj:`None`
+      uses :py:data:`const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX`.
     :return:
     """
     _LOGGER.debug(
@@ -173,11 +174,11 @@ def cross_location_copy(
         notification_pubsub_topic,
     )
     try:
-        result = _bq_base.cross_location_dataset_copy(
+        result = _bq_base.dataset_transfer_config_run(
             source_table_fqn_id=source_table_fqn_id,
             target_table_fqn_id=target_table_fqn_id,
             notification_pubsub_topic=notification_pubsub_topic,
-            bq_transfer_sa=bq_transfer_sa,
+            transfer_config_display_name_prefix=transfer_config_display_name_prefix,
         )
     except Exception as err:  # pylint: disable=broad-except
         raise RuntimeError(
@@ -187,6 +188,24 @@ def cross_location_copy(
             f'Error: {err}'
         ) from err
     return result
+
+
+def remove_all_transfer_config_by_display_name_prefix(
+    *, project_id: str, location: str, prefix: Optional[str] = None
+) -> None:
+    """
+    Gets all :py:class:`bigquery_datatransfer.TransferConfig` in `project_id`
+      and whose display name starts with `prefix` and remove them.
+
+    :param project_id:
+    :param location:
+    :param prefix: if :py:obj:`None` uses :py:data:`const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX`.
+    :return:
+    """
+    for t_config in _bq_base.list_transfer_config_by_display_name_prefix(
+        project_id=project_id, location=location, prefix=prefix
+    ):
+        _bq_base.remove_transfer_config(t_config.name)
 
 
 def bigquery_valid_string(

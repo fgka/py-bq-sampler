@@ -133,6 +133,7 @@ def test__process_start_ok(monkeypatch):
     sample_policy_prefix_req_lst: List[command.CommandSampleStart] = []
     called_drop = False
     called_remove = False
+    called_removed_transfer_config = False
     called_publish = False
 
     def mocked_drop_all_sample_tables(  # pylint: disable=unused-argument
@@ -160,6 +161,12 @@ def test__process_start_ok(monkeypatch):
         assert project_id == config.target_project_id
         called_remove = True
 
+    def mock_remove_all_transfer_config(*, project_id: str, location: str) -> None:
+        nonlocal called_removed_transfer_config
+        assert project_id == config.target_project_id
+        assert location == config.target_location
+        called_removed_transfer_config = True
+
     _mock_general_config(monkeypatch, config)
     monkeypatch.setattr(process_request.sampler_bucket.gcs, 'read_object', gcs_on_disk.read_object)
     monkeypatch.setattr(
@@ -178,12 +185,18 @@ def test__process_start_ok(monkeypatch):
         'remove_all_empty_sample_datasets',
         mock_remove_all_empty_sample_datasets,
     )
+    monkeypatch.setattr(
+        process_request.sampler_query,
+        'remove_all_transfer_config',
+        mock_remove_all_transfer_config,
+    )
     monkeypatch.setattr(process_request.pubsub, 'publish', mocked_publish)
     # When
     process_request._process_start(cmd)
     # Then
     assert called_drop
     assert called_remove
+    assert called_removed_transfer_config
     assert called_publish
     assert len(sample_policy_prefix_req_lst) == 3
     for start_prefix_req in sample_policy_prefix_req_lst:

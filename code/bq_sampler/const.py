@@ -10,6 +10,8 @@ Default values for creating an attributes class. To be used as::
 import re
 from typing import Dict
 
+import bq_sampler
+
 
 ###########
 #  ATTRS  #
@@ -94,6 +96,11 @@ TRANSFER_RUN_PARAMS_SOURCE_PROJECT_ID_ATTR: str = 'source_project_id'
 TRANSFER_CONFIG_FROM_RUN_NAME_RE: re.Pattern = re.compile(
     re.compile(r'^(projects/[^/\s]+/locations/[^/\s]+/transferConfigs/[^/\s]+)/runs/\S+$')
 )
-TRANSFER_CONFIG_NAME_RE: re.Pattern = re.compile(
+TRANSFER_CONFIG_RESOURCE_NAME_RE: re.Pattern = re.compile(
     re.compile(r'^projects/([^/\s]+)/locations/([^/\s]+)/transferConfigs/([^/\s]+)$')
 )
+# transfer config
+TRANSFER_CONFIG_DISPLAY_NAME_PREFIX: str = f'{bq_sampler.__name__}_triggered_WILL_BE_REMOVED_'
+TRANSFER_CONFIG_UPDATE_MASK_NOTIFICATION_PUBSUB_TOPIC: str = 'notification_pubsub_topic'
+# temp dataset
+TRANSFER_TEMP_DATASET_NAME_PREFIX: str = f'{bq_sampler.__name__}_created_WILL_BE_REMOVED_'

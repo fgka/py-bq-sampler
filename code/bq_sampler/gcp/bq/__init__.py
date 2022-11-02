@@ -19,5 +19,6 @@ from bq_sampler.gcp.bq._bq_helper import (
     drop_all_tables_by_labels,
     query_job_result,
     remove_all_empty_datasets_by_labels,
+    remove_all_transfer_config_by_display_name_prefix,
     row_count,
 )

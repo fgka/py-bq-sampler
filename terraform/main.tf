@@ -121,7 +121,6 @@ module "sampler" {
   environment_variables = {
     BQ_TARGET_LOCATION             = local.bq_target_location
     BQ_TRANSFER_NOTIFICATION_TOPIC = module.pubsub_bq_notification.id
-    BQ_TRANSFER_SA_EMAIL           = module.sampler_service_account.email
     TARGET_PROJECT_ID              = var.target_project_id
     POLICY_BUCKET_NAME             = module.policy_bucket.name
     REQUEST_BUCKET_NAME            = module.request_bucket.name
@@ -314,9 +313,8 @@ module "notification_secret" {
 
 resource "google_project_iam_binding" "project_iam_bq_transfer_pubsub" {
   project = var.target_project_id
-  role    = "roles/pubsub.publisher"
+  role    = "roles/pubsub.admin"
   members = [
-    "serviceAccount:service-${data.google_project.target_project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com",
     "serviceAccount:${module.sampler_service_account.email}",
   ]
 }
