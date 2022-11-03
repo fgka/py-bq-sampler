@@ -36,18 +36,6 @@ _TEST_TARGET_DIFF_LOC_TABLE_REF: table.TableReference = table.TableReference.fro
 _TEST_SAMPLE_AMOUNT: int = 13
 
 
-def test_random_sample_ok(monkeypatch):
-    # Given
-    query_validation_fn = _query_validation_fn(is_random_query=True, has_insert=False)
-    _mock_calls_bq(monkeypatch, query_validation_fn=query_validation_fn)
-    # When
-    result = sampler_query.random_sample(
-        table_ref=_TEST_SOURCE_TABLE_REF, amount=_TEST_SAMPLE_AMOUNT
-    )
-    # Then
-    assert result == _DEFAULT_MOCKED_QUERY_JOB_RESULT
-
-
 class StubbedRowIterator:
     def __init__(self, amount: int):
         self.total_rows = amount
@@ -62,6 +50,9 @@ _RANDOM_QUERY_SUB_STRINGS: List[str] = [
     'TABLESAMPLE SYSTEM (',
     'PERCENT)',
 ]
+_RANDOM_QUERY_RAND_SUB_STRINGS: List[str] = [
+    'ORDER BY RAND()',
+]
 _SORTED_QUERY_SUB_STRINGS: List[str] = [
     'ORDER BY ',
 ]
@@ -72,11 +63,15 @@ def _query_validation_fn(
     extra_query_sub_strings: Optional[List[str]] = None,
     is_random_query: Optional[bool] = True,
     has_insert: Optional[bool] = False,
+    uses_rand: Optional[bool] = False,
 ) -> Callable[[str], None]:
     query_sub_strings = []
     query_sub_strings.extend(_COMMON_QUERY_SUB_STRINGS)
     if is_random_query:
-        query_sub_strings.extend(_RANDOM_QUERY_SUB_STRINGS)
+        if uses_rand:
+            query_sub_strings.extend(_RANDOM_QUERY_RAND_SUB_STRINGS)
+        else:
+            query_sub_strings.extend(_RANDOM_QUERY_SUB_STRINGS)
     else:
         query_sub_strings.extend(_SORTED_QUERY_SUB_STRINGS)
     if has_insert:
@@ -97,10 +92,14 @@ def _mock_calls_bq(
     query_job_result: Optional[Any] = _DEFAULT_MOCKED_QUERY_JOB_RESULT,
     row_count: Optional[int] = _DEFAULT_MOCKED_ROW_COUNT,
     query_validation_fn: Optional[Callable[[str], None]] = None,
+    fail_tablesample_stmt: Optional[bool] = False,
 ) -> None:
     def mocked_bq_query_job_result(*args, **kwargs) -> Any:  # pylint: disable=unused-argument
+        query = kwargs.get('query')
+        if fail_tablesample_stmt and 'TABLESAMPLE' in query:
+            raise RuntimeError(f'Failing tablesample in query {query}')
         if query_validation_fn is not None:
-            query_validation_fn(kwargs.get('query'))
+            query_validation_fn(query)
         return query_job_result
 
     monkeypatch.setattr(sampler_query.bq, 'query_job_result', mocked_bq_query_job_result)
@@ -133,81 +132,8 @@ def _mock_calls_bq(
     monkeypatch.setattr(sampler_query.bq, 'drop_table', mocked_drop_table)
 
 
-@pytest.mark.parametrize(
-    'table_ref,amount',
-    [
-        (None, None),  # None testing
-        (_TEST_SOURCE_TABLE_REF, None),
-        (None, _TEST_SAMPLE_AMOUNT),
-        (_TEST_SOURCE_TABLE_FQN_ID, _TEST_SAMPLE_AMOUNT),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, -1),
-    ],
-)
-def test_random_sample_nok(monkeypatch, table_ref: Any, amount: Any):
-    # Given
-    _mock_calls_bq(monkeypatch)
-    # When/Then
-    with pytest.raises(ValueError):
-        sampler_query.random_sample(table_ref=table_ref, amount=amount)
-
-
 _TEST_SORT_COLUMN_NAME: str = 'TEST_COLUMN'
 _TEST_SORT_ORDER: str = const.BQ_ORDER_BY_DESC
-
-
-def test_sorted_sample_ok(monkeypatch):
-    # Given
-    query_validation_fn = _query_validation_fn(is_random_query=False, has_insert=False)
-    _mock_calls_bq(monkeypatch, query_validation_fn=query_validation_fn)
-    # When
-    result = sampler_query.sorted_sample(
-        table_ref=_TEST_SOURCE_TABLE_REF,
-        amount=_TEST_SAMPLE_AMOUNT,
-        column=_TEST_SORT_COLUMN_NAME,
-        order=_TEST_SORT_ORDER,
-    )
-    # Then
-    assert result == _DEFAULT_MOCKED_QUERY_JOB_RESULT
-
-
-@pytest.mark.parametrize(
-    'table_ref,amount,column,order',
-    [
-        (None, None, None, None),  # None testing
-        (None, _TEST_SAMPLE_AMOUNT, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),
-        (_TEST_SOURCE_TABLE_REF, None, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),
-        (_TEST_SOURCE_TABLE_REF, _TEST_SAMPLE_AMOUNT, None, _TEST_SORT_ORDER),
-        (_TEST_SOURCE_TABLE_REF, _TEST_SAMPLE_AMOUNT, _TEST_SORT_COLUMN_NAME, None),
-        (
-            _TEST_SOURCE_TABLE_FQN_ID,
-            _TEST_SAMPLE_AMOUNT,
-            _TEST_SORT_COLUMN_NAME,
-            _TEST_SORT_ORDER,
-        ),  # table_ref is a string
-        (_TEST_SOURCE_TABLE_REF, -1, _TEST_SORT_COLUMN_NAME, _TEST_SORT_ORDER),
-        (
-            _TEST_SOURCE_TABLE_REF,
-            _TEST_SAMPLE_AMOUNT,
-            '',
-            _TEST_SORT_ORDER,
-        ),  # column not a valid string
-        (_TEST_SOURCE_TABLE_REF, _TEST_SAMPLE_AMOUNT, ' ', _TEST_SORT_ORDER),
-        (_TEST_SOURCE_TABLE_REF, _TEST_SAMPLE_AMOUNT, '\n', _TEST_SORT_ORDER),
-        (
-            _TEST_SOURCE_TABLE_REF,
-            _TEST_SAMPLE_AMOUNT,
-            _TEST_SORT_COLUMN_NAME,
-            _TEST_SORT_ORDER + '_WRONG',
-        ),  # invalid order
-        (_TEST_SOURCE_TABLE_REF, _TEST_SAMPLE_AMOUNT, _TEST_SORT_COLUMN_NAME, 'NOT_VALID'),
-    ],
-)
-def test_sorted_sample_nok(monkeypatch, table_ref: Any, amount: Any, column: Any, order: Any):
-    # Given
-    _mock_calls_bq(monkeypatch)
-    # When/Then
-    with pytest.raises(ValueError):
-        sampler_query.sorted_sample(table_ref=table_ref, amount=amount, column=column, order=order)
 
 
 @pytest.mark.parametrize(
@@ -274,6 +200,28 @@ def test_create_table_with_random_sample_ok(monkeypatch):
         monkeypatch,
         query_validation_fn=query_validation_fn,
         query_job_result=StubbedRowIterator(amount),
+    )
+    # When
+    result = sampler_query.create_table_with_random_sample(
+        source_table_ref=_TEST_SOURCE_TABLE_REF,
+        target_table_ref=_TEST_TARGET_TABLE_REF,
+        amount=amount,
+    )
+    # Then
+    assert isinstance(result, int)
+
+
+def test_create_table_with_random_sample_ok_view(monkeypatch):
+    # Given
+    amount = _TEST_SAMPLE_AMOUNT
+    query_validation_fn = _query_validation_fn(
+        is_random_query=True, has_insert=True, uses_rand=True
+    )
+    _mock_calls_bq(
+        monkeypatch,
+        query_validation_fn=query_validation_fn,
+        query_job_result=StubbedRowIterator(amount),
+        fail_tablesample_stmt=True,
     )
     # When
     result = sampler_query.create_table_with_random_sample(

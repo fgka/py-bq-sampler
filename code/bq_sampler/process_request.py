@@ -7,6 +7,7 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 import cachetools
+import tenacity
 
 from bq_sampler.entity import command, table, policy
 from bq_sampler import const, logger, sampler_bucket, sampler_query
@@ -87,16 +88,20 @@ class _GeneralConfig:  # pylint: disable=too-many-instance-attributes
         return self._sampling_lock_path
 
 
-def process(value: command.CommandBase) -> str:
+def process(value: command.CommandBase, *, with_retry: Optional[bool] = True) -> str:
     """
     Single entry point to process commands coming from Pub/Sub.
 
     :param value:
+    :param with_retry:
     :return:
     """
-    _LOGGER.info('Processing command <%s>', value)
+    _LOGGER.info('Processing command <%s> with retry to <%s>', value, with_retry)
     try:
-        _process(value)
+        if with_retry:
+            _process_with_retry(value)
+        else:
+            _process(value)
         _LOGGER.info('Processed command <%s>', value)
     except Exception as err:  # pylint: disable=broad-except
         error_data = {
@@ -107,6 +112,15 @@ def process(value: command.CommandBase) -> str:
         _LOGGER.error('Sent error to %s. Message: %s', _general_config().pubsub_error, error_data)
         raise RuntimeError(f'Could not process command: <{value}>. Error: {err}') from err
     return 'OK'
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_not_exception_type(ValueError),
+    wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+    stop=tenacity.stop_after_attempt(3),
+)
+def _process_with_retry(value: command.CommandBase) -> None:
+    _process(value)
 
 
 def _process(value: command.CommandBase) -> None:

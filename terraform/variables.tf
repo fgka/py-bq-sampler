@@ -85,7 +85,7 @@ variable "sampler_function_max_instances" {
 variable "sampler_function_memory" {
   description = "The memory allocation for function in MB."
   type        = number
-  default     = 512
+  default     = 256
 }
 
 variable "sampler_function_timeout" {
