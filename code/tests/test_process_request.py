@@ -81,7 +81,7 @@ def test_process_nok(monkeypatch):
     monkeypatch.setattr(process_request.pubsub, 'publish', mocked_publish)
     # When
     with pytest.raises(RuntimeError):
-        process_request.process(cmd)
+        process_request.process(cmd, with_retry=False)
         # Then
         assert called
 

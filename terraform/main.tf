@@ -74,6 +74,7 @@ module "cmd_pubsub_service_account" {
     ]
   }
 }
+
 // GCS //
 
 module "policy_bucket" {
@@ -309,7 +310,6 @@ module "notification_secret" {
 ////////////////////
 
 // X-Project Permissions //
-
 
 resource "google_project_iam_binding" "project_iam_bq_transfer_pubsub" {
   project = var.target_project_id

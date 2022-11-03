@@ -19,9 +19,7 @@ from bq_sampler.gcp.bq import _bq_base
 
 _LOGGER = logger.get(__name__)
 
-"""
-Default GCP resource label to be applied table created here.
-"""
+_ROW_COUNT_FOR_VIEW_QUERY_TMPL: str = 'SELECT COUNT(*) FROM `%s`'
 
 
 @cachetools.cached(cache=cachetools.LRUCache(maxsize=100_000))
@@ -39,8 +37,22 @@ def row_count(*, table_fqn_id: str) -> int:
     _LOGGER.debug('Reading table size from <%s>', table_fqn_id)
     table = _bq_base.table(table_fqn_id=table_fqn_id)
     result = table.num_rows
+    if result == 0 and table.view_query:
+        _LOGGER.info('The table <%s> is view, computing num of rows using SQL', table_fqn_id)
+        result = _row_count_by_count(table=table)
     _LOGGER.debug('Table <%s> has %d rows', table_fqn_id, result)
     return result
+
+
+def _row_count_by_count(table: bigquery.Table) -> int:
+    _LOGGER.info('Computing num of rows for table <%s> using SQL', table.full_table_id)
+    query_result: bigquery.table.RowIterator = query_job_result(
+        query=_ROW_COUNT_FOR_VIEW_QUERY_TMPL % table.full_table_id.replace(':', '.'),
+        project_id=table.project,
+        location=table.location,
+    )
+    row: bigquery.table.Row = next(query_result)
+    return row.values()[0]
 
 
 def query_job_result(

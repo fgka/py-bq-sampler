@@ -52,7 +52,7 @@ def handler(  # pylint: disable=unused-argument
             f'and environment: <{os.environ}>. '
             f'Error: {err}'
         )
-        _LOGGER.critical(response)
+        _LOGGER.exception(response)
     return response
 
 
