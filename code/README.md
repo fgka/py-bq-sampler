@@ -27,10 +27,6 @@ You will need:
 
 ## [Development](DEVELOPMENT.md)
 
-## [Infrastructure](INFRASTRUCTURE.md)
-
-### [Deploy](DEPLOY.md)
-
 ### [Integration Tests](INTEG_TESTING.md)
 
 ## Install
