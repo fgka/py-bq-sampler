@@ -73,7 +73,7 @@ gcloud services enable \
 terraform init
 ```
 
-## Plan
+## Plan and Apply
 
 Without integration test data:
 
@@ -84,7 +84,8 @@ terraform plan \
   -var "project_id=${PROJECT_ID}" \
   -var "target_project_id=${TARGET_PROJECT_ID}" \
   -var "region=${REGION}" \
-  -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
+  -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}" \
+  && terraform apply ${TMP} && rm -f ${TMP}
 ```
 
 With integration test data:
@@ -97,14 +98,8 @@ terraform plan \
   -var "target_project_id=${TARGET_PROJECT_ID}" \
   -var "region=${REGION}" \
   -var "notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}" \
-  -var "create_integ_test_data=true"
-```
-
-
-## Apply
-
-```bash
-terraform apply ${TMP} && rm -f ${TMP}
+  -var "create_integ_test_data=true" \
+  && terraform apply ${TMP} && rm -f ${TMP}
 ```
 
 ## Add missing bits
@@ -116,8 +111,6 @@ OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
 echo "Terraform output in ${OUT_JSON}"
 
-export PROJECT_ID=$(jq -c -r '.sampler_function.value.project' ${OUT_JSON})
-export TARGET_PROJECT_ID=$(jq -c -r '.request_bucket.value.project' ${OUT_JSON})
 export LOCATION=$(jq -c -r '.sampler_function.value.region' ${OUT_JSON})
 export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
 export POLICY_BUCKET=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
@@ -228,18 +221,44 @@ gsutil cp ${CFG_FILE} ${NOTIFICATION_CONFIG_URI}
 
 ### Error in PubSub
 
+Send error message:
 ```bash
+PUBSUB_SENT_DATE=$(date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
+LOG_QUERY_SUFFIX="severity>=INFO timestamp>=\"${PUBSUB_SENT_DATE}\""
+JQ_QUERY='.[] | (.timestamp + " - " + .textPayload)'
 gcloud pubsub topics publish ${PUBSUB_ERROR_TOPIC} \
   --project="${PROJECT_ID}" \
   --message="{\"key\":\"value\"}"
 ```
 
+Check logs:
+```bash
+gcloud logging read \
+  "resource.labels.function_name=${NOTIFICATION_FUNCTION_NAME} ${LOG_QUERY_SUFFIX}" \
+  --format=json \
+  --project="${PROJECT_ID}" \
+  | jq -cr ${JQ_QUERY}
+```
+
 ### Full Sampling
 
+Trigger sampling:
 ```bash
+PUBSUB_SENT_DATE=$(date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
+LOG_QUERY_SUFFIX="severity>=INFO timestamp>=\"${PUBSUB_SENT_DATE}\""
+JQ_QUERY='.[] | (.timestamp + " - " + .textPayload)'
 gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
   --location="${LOCATION}"
+```
+
+Check logs:
+```bash
+gcloud logging read \
+  "resource.labels.function_name=${FUNCTION_NAME} ${LOG_QUERY_SUFFIX}" \
+  --format=json \
+  --project="${PROJECT_ID}" \
+  | jq -cr ${JQ_QUERY}
 ```
 
 ## Integration tests
@@ -256,9 +275,6 @@ OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
 echo "Terraform output in ${OUT_JSON}"
 
-export PROJECT_ID=$(jq -c -r '.sampler_function.value.project' ${OUT_JSON})
-export TARGET_PROJECT_ID=$(jq -c -r '.request_bucket.value.project' ${OUT_JSON})
-export REGION=$(jq -c -r '.sampler_function.value.region' ${OUT_JSON})
 export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
 export FUNCTION_SA=$(jq -c -r '.sampler_function_service_account.value.account_id' ${OUT_JSON})
 export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
