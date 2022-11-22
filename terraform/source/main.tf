@@ -5,7 +5,6 @@
 locals {
   // from target project
   request_bucket_name             = "${var.request_bucket_name_prefix}-${data.google_project.target_project.number}"
-  pubsub_bq_notification_topic_id = "projects/${data.google_project.target_project.name}/topics/${var.pubsub_bq_notification_topic_name}"
   bq_target_location              = var.bq_target_location != null ? var.bq_target_location : var.region
   // notification function
   notification_function_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}"
@@ -105,6 +104,25 @@ module "pubsub_err" {
   }
 }
 
+resource "google_pubsub_subscription" "pubsub_bq_notification_sampler" {
+  count = var.pubsub_bq_notification_topic_id == null ? 0 : 1
+  name  = "${var.sampler_function_name}_http_bq_notification_push_subscription"
+  topic = var.pubsub_bq_notification_topic_id
+  project = var.project_id
+  push_config {
+    push_endpoint = module.sampler.function.https_trigger_url
+    oidc_token {
+      service_account_email = module.cmd_pubsub_service_account.email
+      audience              = module.sampler.function.https_trigger_url
+    }
+  }
+  ack_deadline_seconds       = var.sampler_function_timeout
+  message_retention_duration = "1200s" # 20 minutes
+  retry_policy {
+    minimum_backoff = "10s"
+  }
+}
+
 /////////////////////
 // Cloud Functions //
 /////////////////////
@@ -124,7 +142,7 @@ module "sampler" {
   }
   environment_variables = {
     BQ_TARGET_LOCATION             = local.bq_target_location
-    BQ_TRANSFER_NOTIFICATION_TOPIC = local.pubsub_bq_notification_topic_id
+    BQ_TRANSFER_NOTIFICATION_TOPIC = try(var.pubsub_bq_notification_topic_id, "TODO")
     TARGET_PROJECT_ID              = var.target_project_id
     POLICY_BUCKET_NAME             = module.policy_bucket.name
     REQUEST_BUCKET_NAME            = local.request_bucket_name

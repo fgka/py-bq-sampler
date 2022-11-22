@@ -10,6 +10,10 @@ output "notification_function_service_account" {
   value = module.notification_function_service_account.service_account
 }
 
+output "cmd_pubsub_service_account" {
+  value = module.cmd_pubsub_service_account.service_account
+}
+
 /////////////////////
 // Cloud Functions //
 /////////////////////
@@ -48,6 +52,10 @@ output "pubsub_cmd_sampler" {
 
 output "pubsub_err" {
   value = module.pubsub_err.topic
+}
+
+output "pubsub_bq_notification_sampler" {
+  value = google_pubsub_subscription.pubsub_bq_notification_sampler
 }
 
 ///////////////

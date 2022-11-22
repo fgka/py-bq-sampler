@@ -123,6 +123,8 @@ OPT_PUBSUB_ERROR="pubsub-error"
 OPT_SCHED_JOB="cronjob"
 OPT_POLICY_BUCKET="policy-bucket"
 OPT_REQUEST_BUCKET="request-bucket"
+OPT_BQ_REGION="bq-region"
+OPT_PUBSUB_BQ="pubsub-bq"
 
 unset ARGUMENT_FLAG_LIST
 set -a ARGUMENT_FLAG_LIST
@@ -147,6 +149,8 @@ ARGUMENT_LIST=(
   "${OPT_SCHED_JOB}"
   "${OPT_POLICY_BUCKET}"
   "${OPT_REQUEST_BUCKET}"
+  "${OPT_BQ_REGION}"
+  "${OPT_PUBSUB_BQ}"
 )
 
 # read arguments
@@ -163,10 +167,12 @@ CLI_ARGS=$(
 ###############################################################
 
 DEFAULT_REGION="europe-west3"
+DEFAULT_BQ_TARGET_LOCATION="${DEFAULT_REGION}"
 DEFAULT_FUNCTION_NAME="bq-sampler"
 DEFAULT_FUNCTION_SA="${FUNCTION_NAME}-sa"
 DEFAULT_PUBSUB_CMD_TOPIC="${FUNCTION_NAME}-cmd"
 DEFAULT_PUBSUB_ERROR_TOPIC="${FUNCTION_NAME}-error"
+DEFAULT_BQ_TRANSFER_NOTIFICATION_TOPIC="${FUNCTION_NAME}-bq-transfer-notification"
 DEFAULT_SCHEDULER_JOB_NAME="cronjob-${FUNCTION_NAME}"
 DEFAULT_POLICY_BUCKET_NAME="sample-policy-1234"
 DEFAULT_REQUEST_BUCKET_NAME="sample-request-9876"
@@ -180,6 +186,8 @@ PROJECT_NUMBER=""
 TARGET_PROJECT_ID=""
 TARGET_PROJECT_NUMBER=""
 REGION="${DEFAULT_REGION}"
+BQ_TARGET_LOCATION="${DEFAULT_BQ_TARGET_LOCATION}"
+BQ_TRANSFER_NOTIFICATION_TOPIC="${DEFAULT_BQ_TRANSFER_NOTIFICATION_TOPIC}"
 LOCATION="${REGION}"
 FUNCTION_NAME="${DEFAULT_FUNCTION_NAME}"
 FUNCTION_SA="${DEFAULT_FUNCTION_SA}"
@@ -376,6 +384,7 @@ function help {
   echo -e "Usage:"
   echo -e "\t${0} [-h | --${OPT_HELP}] [--${OPT_VERBOSE}] [--${OPT_NO_DEPLOY}] [--${OPT_IS_FUNCTION_DEBUG}]"
   echo -e "\t\t--${OPT_TARGET_PRJ_ID} <TARGET_PROJECT_ID>"
+  echo -e "\t\t[--${OPT_PUBSUB_BQ} <BQ_TRANSFER_NOTIFICATION_TOPIC>]"
   echo -e "\t\t[--${OPT_LOGFILE} <LOG_FILE>]"
   echo -e "\t\t[--${OPT_REGION} <REGION>]"
   echo -e "\t\t[--${OPT_PRJ_ID} <PROJECT_ID>]"
@@ -386,6 +395,7 @@ function help {
   echo -e "\t\t[--${OPT_SCHED_JOB} <SCHEDULER_JOB_NAME>]"
   echo -e "\t\t[--${OPT_POLICY_BUCKET} <POLICY_BUCKET_NAME>]"
   echo -e "\t\t[--${OPT_REQUEST_BUCKET} <REQUEST_BUCKET_NAME>]"
+  echo -e "\t\t[--${OPT_BQ_REGION} <BQ_TARGET_LOCATION>]"
   echo -e "Where:"
   echo -e "\t-h | --${OPT_HELP} this help"
   echo -e "\t--${OPT_VERBOSE} set log level to DEBUG"
@@ -395,6 +405,8 @@ function help {
   echo -e "\t--${OPT_REGION} with <REGION> overwriting the default region, which is '${DEFAULT_REGION}'"
   echo -e "\t--${OPT_PRJ_ID} with <PROJECT_ID> overwriting the default, which is the current authenticated project ID"
   echo -e "\t--${OPT_TARGET_PRJ_ID} with <TARGET_PROJECT_ID> being where the sample should land, always required"
+  echo -e "\t--${OPT_BQ_REGION} with <BQ_TARGET_LOCATION> being where the sample is to be located in the target project, default is '${DEFAULT_BQ_TARGET_LOCATION}'"
+  echo -e "\t--${OPT_PUBSUB_BQ} with <BQ_TRANSFER_NOTIFICATION_TOPIC> used by BigQuery transfer for notifying when x-region transfer is done, default is '${DEFAULT_BQ_TRANSFER_NOTIFICATION_TOPIC}'"
   echo
   echo -e "Example:"
   echo -e "\t${0} --${OPT_LOGFILE} integ_test.log \\"
@@ -406,7 +418,9 @@ function help {
   echo -e "\t\t--${OPT_PUBSUB_ERROR} ${DEFAULT_PUBSUB_ERROR_TOPIC} \\"
   echo -e "\t\t--${OPT_SCHED_JOB} ${DEFAULT_SCHEDULER_JOB_NAME} \\"
   echo -e "\t\t--${OPT_POLICY_BUCKET} ${DEFAULT_POLICY_BUCKET_NAME} \\"
-  echo -e "\t\t--${OPT_REQUEST_BUCKET} ${DEFAULT_REQUEST_BUCKET_NAME}"
+  echo -e "\t\t--${OPT_REQUEST_BUCKET} ${DEFAULT_REQUEST_BUCKET_NAME} \\"
+  echo -e "\t\t--${OPT_BQ_REGION} ${DEFAULT_BQ_TARGET_LOCATION} \\"
+  echo -e "\t\t--${OPT_PUBSUB_BQ} ${DEFAULT_BQ_TRANSFER_NOTIFICATION_TOPIC}"
   echo
 }
 
@@ -577,14 +591,14 @@ function _list_all_datasets {
   local PRJ_ID=${1}
 
   # format: <PRJ>:<DS>
-  exec_cmd_out "bq --location ${LOCATION} --project_id ${PRJ_ID} --format json ls -d" |
+  exec_cmd_out "bq --location ${BQ_TARGET_LOCATION} --project_id ${PRJ_ID} --format json ls -d" |
     jq -c -r '.[].id'
 }
 
 function _delete_big_query_dataset {
   local DATASET_ID=${1}
 
-  exec_cmd "bq --location ${LOCATION} rm -r -f ${DATASET_ID}"
+  exec_cmd "bq --location ${BQ_TARGET_LOCATION} rm -r -f ${DATASET_ID}"
 }
 
 ### BigQuery: table
@@ -592,14 +606,14 @@ function _delete_big_query_dataset {
 function _drop_big_query_table {
   local TBL_ID=${1}
 
-  exec_cmd "bq --location ${LOCATION} rm -f ${TBL_ID}"
+  exec_cmd "bq --location ${BQ_TARGET_LOCATION} rm -f ${TBL_ID}"
 }
 
 function _list_all_tables_in_dataset {
   local DATASET_ID=${1}
 
   # format: <PRJ>:<DS>.<TBL>
-  exec_cmd_out "bq --location ${LOCATION} --format json ls ${DATASET_ID}" |
+  exec_cmd_out "bq --location ${BQ_TARGET_LOCATION} --format json ls ${DATASET_ID}" |
     jq -c -r '.[].id'
 }
 
@@ -624,7 +638,7 @@ function _big_query_copy_table {
   local TBL_ID=${1}
   local TBL_NEW_ID=${2}
 
-  exec_cmd "bq --location ${LOCATION} cp ${TBL_ID} ${TBL_NEW_ID}"
+  exec_cmd "bq --location ${BQ_TARGET_LOCATION} cp ${TBL_ID} ${TBL_NEW_ID}"
 }
 
 function big_query_table_details {
@@ -635,7 +649,7 @@ function big_query_table_details {
     exit 1
   fi
   log_info "Getting details for BigQuery table ${TBL_ID}"
-  exec_cmd_out "bq --location ${LOCATION} --project_id ${PRJ_ID} --format json show ${TBL_ID}" |
+  exec_cmd_out "bq --location ${BQ_TARGET_LOCATION} --project_id ${PRJ_ID} --format json show ${TBL_ID}" |
     jq -c '{"table":.id, "columns": [.schema.fields[].name], "rows": .numRows}'
 }
 
@@ -673,14 +687,14 @@ function big_query_table_add_column {
 function _big_query_table_schema {
   local TBL_ID=${1}
 
-  exec_cmd_out "bq --location ${LOCATION} --format json show --schema ${TBL_ID}"
+  exec_cmd_out "bq --location ${BQ_TARGET_LOCATION} --format json show --schema ${TBL_ID}"
 }
 
 function _big_query_update_schema {
   local TBL_ID=${1}
   local SCHEMA_FILE=${2}
 
-  exec_cmd "bq --location ${LOCATION} update --schema ${SCHEMA_FILE} ${TBL_ID}"
+  exec_cmd "bq --location ${BQ_TARGET_LOCATION} update --schema ${SCHEMA_FILE} ${TBL_ID}"
 }
 
 function big_query_table_drop_column {
@@ -736,6 +750,8 @@ function deploy_function {
   ENV_VARS+=("SAMPLING_LOCK_OBJECT_PATH=${SAMPLING_LOCK_OBJECT_PATH}")
   ENV_VARS+=("CMD_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_CMD_TOPIC}")
   ENV_VARS+=("ERROR_TOPIC_NAME=projects/${PROJECT_ID}/topics/${PUBSUB_ERROR_TOPIC}")
+  ENV_VARS+=("BQ_TARGET_LOCATION=${BQ_TARGET_LOCATION}")
+  ENV_VARS+=("BQ_TRANSFER_NOTIFICATION_TOPIC=projects/${TARGET_PROJECT_ID}/topics/${BQ_TRANSFER_NOTIFICATION_TOPIC}")
   ENV_VARS+=("LOG_LEVEL=${LOG_LEVEL}")
   local ENV_VARS_COMMA=$(
     local IFS=","
@@ -1140,6 +1156,14 @@ while [[ ${#} -gt 0 ]]; do
     ;;
   --${OPT_REQUEST_BUCKET})
     REQUEST_BUCKET_NAME=${2}
+    shift 2
+    ;;
+  --${OPT_BQ_REGION})
+    BQ_TARGET_LOCATION=${2}
+    shift 2
+    ;;
+  --${OPT_PUBSUB_BQ})
+    BQ_TRANSFER_NOTIFICATION_TOPIC=${2}
     shift 2
     ;;
   *)

@@ -184,10 +184,10 @@ variable "pubsub_error_topic_name" {
   default     = "bq-sampler-err"
 }
 
-variable "pubsub_bq_notification_topic_name" {
-  description = "Name of the PubSub topic to send BigQuery transfer runs' notifications to."
+variable "pubsub_bq_notification_topic_id" {
+  description = "Name of the PubSub topic to send BigQuery Transfer notifications."
   type        = string
-  default     = "bq-sampler-bq-transfer-notification"
+  default     = null
 }
 
 variable "pubsub_cmd_service_account_name" {
