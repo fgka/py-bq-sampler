@@ -120,7 +120,7 @@ gcloud logging read \
 
 ## Integration tests
 
-### [Trigger BigQuery cloning jobs](./1_source/README.md)
+### [Trigger BigQuery cloning jobs](./1_source/README.md#optionally-trigger-integration-test-data-transfer)
 
 ### Execute the integration tests
 
