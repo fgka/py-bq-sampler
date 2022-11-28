@@ -1,9 +1,52 @@
 # Deploy CloudFunction
 
-Requires deployment as indicated in [terraform](../terraform/README.md) *with* integration data set,
-as indicated in [source](../terraform/source/README.md)'s [With integration test data](../terraform/source/README.md#with-integration-test-data).
+Requires deployment as indicated in [terraform](../terraform/README.md) *with* integration data set.
 
 ## Run manual integration tests
+
+### Definitions
+
+PubSub, Scheduler, and Transfer:
+```bash
+pushd ../terraform/1_source
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export SAMPLER_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.sampler_function_service_account.value.email' ${OUT_JSON})
+export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
+export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
+export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+PubSub:
+```bash
+pushd ../terraform/2_target
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export PUBSUB_BQ_NOTIFICATION_TOPIC=$(jq -c -r '.pubsub_bq_notification.value.id' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+Functions:
+```bash
+pushd ../terraform/3_source
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
+export POLICY_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
+export REQUEST_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.REQUEST_BUCKET_NAME' ${OUT_JSON})
+export BQ_TARGET_REGION=$(jq -c -r '.sampler_function.value.environment_variables.BQ_TARGET_LOCATION' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd
+```
 
 ### Arguments
 
@@ -30,7 +73,7 @@ With deployment:
 MANUAL_INTEG_TESTS_ARGS+=" --sa-email ${SAMPLER_SERVICE_ACCOUNT_EMAIL}"
 MANUAL_INTEG_TESTS_ARGS+=" --pubsub-cmd ${PUBSUB_CMD_TOPIC}"
 MANUAL_INTEG_TESTS_ARGS+=" --pubsub-error ${PUBSUB_ERROR_TOPIC}"
-MANUAL_INTEG_TESTS_ARGS+=" --pubsub-bq ${PUBSUB_BQ_NOTIFICATION_TOPIC_NAME}"
+MANUAL_INTEG_TESTS_ARGS+=" --pubsub-bq ${PUBSUB_BQ_NOTIFICATION_TOPIC}"
 ```
 
 ### Run Tests

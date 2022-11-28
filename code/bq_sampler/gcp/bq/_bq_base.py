@@ -636,7 +636,7 @@ def dataset_transfer_config_run(
     """
     # pylint: enable=line-too-long
     _LOGGER.warning(
-        'Cross location copy is expensive, consider relocating source table. '
+        'Cross location copy is expensive, consider relocating 3_source table. '
         'Copying from <%s> into <%s> with done notification sent to <%s>',
         source_table_fqn_id,
         target_table_fqn_id,

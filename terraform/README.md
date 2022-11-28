@@ -38,26 +38,39 @@ echo "BigQuery target region: ${BQ_TARGET_REGION}"
 echo "Error notification email: ${ERROR_NOTIFICATION_EMAIL_ADDRESS}"
 ```
 
-## [Deploy Source Project](./source/README.md)
+## [Deploy Source Project Supporting Infrastructure](1_source/README.md)
 
-## [Deploy Target Project](./target/README.md)
+## [Deploy Target Project](2_target/README.md)
 
-## [Re-Plan and Apply Source](./source/README.md#re-plan-and-apply)
+## [Deploy Source Project Sampler](3_source/README.md)
 
 ## Testing
 
 ### Set variables
 
+PubSub and Scheduler:
 ```bash
-pushd source
+pushd ./1_source
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
+export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+Functions:
+```bash
+pushd ./3_source
 OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
 echo "Terraform output in ${OUT_JSON}"
 
 export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
 export NOTIFICATION_FUNCTION_NAME=$(jq -c -r '.notification_function.value.name' ${OUT_JSON})
-export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
-export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
+rm -f ${OUT_JSON}
 popd 
 ```
 
@@ -92,7 +105,7 @@ LOG_QUERY_SUFFIX="severity>=INFO timestamp>=\"${PUBSUB_SENT_DATE}\""
 JQ_QUERY='.[] | (.timestamp + " - " + .textPayload)'
 gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
-  --location="${LOCATION}"
+  --location="${REGION}"
 ```
 
 Check logs:
@@ -114,38 +127,35 @@ There a couple of things you need to do before jumping into executing the integr
 
 ### Set environment variables
 
+PubSub, Scheduler, and Transfer:
 ```bash
-pushd source
+pushd ./1_source
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
+export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
+export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+Functions:
+```bash
+pushd ./3_source
 OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
 echo "Terraform output in ${OUT_JSON}"
 
 export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
-export FUNCTION_SA=$(jq -c -r '.sampler_function_service_account.value.account_id' ${OUT_JSON})
-export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
-export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
-export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
 export POLICY_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
 export REQUEST_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.REQUEST_BUCKET_NAME' ${OUT_JSON})
+rm -f ${OUT_JSON}
 popd
 ```
 
-### Trigger BigQuery cloning jobs
-
-This may take multiple minutes, be patient.
-
-```bash
-jq -r '.integ_test_data_transfer.value[].name' ${OUT_JSON} \
-  | while read TRANSFER_NAME
-    do
-      echo "Triggering transfer config: ${TRANSFER_NAME}"
-      bq mk --transfer_run \
-        --location=${REGION} \
-        --project_id=${PROJECT_ID} \
-        --run_time=$(date -u +%FT%TZ) \
-        ${TRANSFER_NAME}
-    done
-```
+### [Trigger BigQuery cloning jobs](./1_source/README.md)
 
 ### Execute the integration tests
 
