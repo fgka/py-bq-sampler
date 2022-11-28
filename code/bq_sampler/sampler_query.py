@@ -349,6 +349,11 @@ def _staging_target_table_ref(
             labels=labels,
             recreate_table=recreate_table,
         )
+        _LOGGER.info(
+            "Defined staging target for x-location sampling. Staging: %s. Actual Target: %s",
+            result,
+            target_table_ref,
+        )
     return result
 
 

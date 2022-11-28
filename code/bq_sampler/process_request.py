@@ -312,7 +312,6 @@ def _process_sample_start(value: command.CommandSampleStart) -> None:
         notification_pubsub_topic=_general_config().pubsub_bq_notification,
         recreate_table=True,
     )
-    amount_inserted = 0
     if sample_type == table.SortType.RANDOM:
         amount_inserted = sampler_query.create_table_with_random_sample(**kwargs)
     elif sample_type == table.SortType.SORTED:
