@@ -28,23 +28,31 @@ import functions_framework
 
 from bq_sampler import entry, logger
 from bq_sampler.notification import email, sendgrid, smtp
+
 # pylint: enable=wrong-import-position
 
 _LOGGER = logger.get(__name__)
 
 
 @functions_framework.http
-def handler_v2(event: Optional[flask.Request] = None) -> str:
+def handler_http(event: Optional[flask.Request] = None) -> str:
+    # pylint: disable=line-too-long
     """
     Entry-point for GCP CloudFunction V2.
     This is just a proxy to keep the code organized in a pythonic way.
+    Name is derived from Terraform module `cloud-foundation-fabric/cloud-function`_.
+    This means that in the Terraform code you need to declare the ``handler``
+        without the ``_http`` suffix, i.e., ``handler`` only to trigger this code-path.
 
     :param event: a :py:class:`flask.Request` with data specific to this type of
         event. The `@type` field maps to `type.googleapis.com/google.pubsub.v1.PubsubMessage`.
         The `data` field maps to the PubsubMessage data in a base64-encoded string.
         The `attributes` field maps to the PubsubMessage attributes if any is present.
     :return:
+
+    .. _cloud-foundation-fabric/cloud-function:https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/blob/master/modules/cloud-function/main.tf#L139
     """
+    # pylint: enable=line-too-long
     return handler(event)
 
 

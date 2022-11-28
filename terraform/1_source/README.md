@@ -2,31 +2,6 @@
 
 Start at the parent [../README.md](../README.md)
 
-## Definitions
-
-### Without integration test data
-
-```bash
-export CREATE_INTEG_TESTS="false" 
-```
-
-### With integration test data
-
-```bash
-export CREATE_INTEG_TESTS="true" 
-```
-
-### Terraform Arguments
-
-```bash
-TERRAFORM_VAR_ARGS="-var \"project_id=${PROJECT_ID}\""
-TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
-TERRAFORM_VAR_ARGS+=" -var \"notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}\""
-TERRAFORM_VAR_ARGS+=" -var \"create_integ_test_data=${CREATE_INTEG_TESTS}\""
-
-echo "Terraform arguments: ${TERRAFORM_VAR_ARGS}"
-```
-
 ## Enable APIs
 
 ```bash
@@ -51,6 +26,30 @@ gcloud services enable \
 terraform init
 ```
 
+## Definitions
+
+### Without integration test data
+
+```bash
+export CREATE_INTEG_TESTS="false" 
+```
+
+### With integration test data
+
+```bash
+export CREATE_INTEG_TESTS="true" 
+```
+
+### Terraform Arguments
+
+```bash
+TERRAFORM_VAR_ARGS="-var \"project_id=${PROJECT_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
+TERRAFORM_VAR_ARGS+=" -var \"notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}\""
+TERRAFORM_VAR_ARGS+=" -var \"create_integ_test_data=${CREATE_INTEG_TESTS}\""
+
+echo "Terraform arguments: ${TERRAFORM_VAR_ARGS}"
+```
 ## Plan and Apply
 
 ```bash

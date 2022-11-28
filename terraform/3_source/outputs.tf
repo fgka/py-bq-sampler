@@ -6,8 +6,12 @@ output "sampler_function" {
   value = module.sampler.function
 }
 
+output "sampler_run" {
+  value = module.sampler.function.service_config[0].service
+}
+
 output "sampler_function_http_url" {
-  value = module.sampler.function.https_trigger_url
+  value = module.sampler.uri
 }
 
 output "notification_function" {

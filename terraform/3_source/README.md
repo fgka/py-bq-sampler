@@ -2,69 +2,6 @@
 
 Start at the parent [../README.md](../README.md)
 
-
-## Definitions
-
-From own Infrastructure:
-```bash
-pushd ../1_source
-OUT_JSON=$(mktemp)
-terraform output -json > ${OUT_JSON}
-echo "Terraform output in ${OUT_JSON}"
-
-export SAMPLER_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.sampler_function_service_account.value.email' ${OUT_JSON})
-export NOTIFICATION_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.notification_function_service_account.value.email' ${OUT_JSON})
-export PUBSUB_CMD_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.cmd_pubsub_service_account.value.email' ${OUT_JSON})
-
-export POLICY_BUCKET=$(jq -c -r '.policy_bucket.value.name' ${OUT_JSON})
-
-export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.id' ${OUT_JSON})
-export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.id' ${OUT_JSON})
-
-export ERROR_MONITORING_CHANNEL=$(jq -c -r '.error_monitoring_channel.value.display_name' ${OUT_JSON})
-export NOTIFICAITON_ERROR_MONITORING_CHANNEL=$(jq -c -r '.notification_error_monitoring_channel.value.display_name' ${OUT_JSON})
-rm -f ${OUT_JSON}
-popd 
-```
-
-From target project:
-```bash
-pushd ../2_target
-OUT_JSON=$(mktemp)
-terraform output -json > ${OUT_JSON}
-echo "Terraform output in ${OUT_JSON}"
-
-export REQUEST_BUCKET=$(jq -c -r '.request_bucket.value.name' ${OUT_JSON})
-export PUBSUB_BQ_NOTIFICATION_TOPIC=$(jq -c -r '.pubsub_bq_notification.value.id' ${OUT_JSON})
-rm -f ${OUT_JSON}
-popd 
-```
-
-### Terraform Arguments
-
-```bash
-TERRAFORM_VAR_ARGS="-var \"project_id=${PROJECT_ID}\""
-TERRAFORM_VAR_ARGS+=" -var \"target_project_id=${TARGET_PROJECT_ID}\""
-TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
-TERRAFORM_VAR_ARGS+=" -var \"bq_target_location=${BQ_TARGET_REGION}\""
-
-TERRAFORM_VAR_ARGS+=" -var \"sampler_service_account_email=${SAMPLER_SERVICE_ACCOUNT_EMAIL}\""
-TERRAFORM_VAR_ARGS+=" -var \"notification_function_service_account_email=${NOTIFICATION_SERVICE_ACCOUNT_EMAIL}\""
-TERRAFORM_VAR_ARGS+=" -var \"pubsub_cmd_service_account_email=${PUBSUB_CMD_SERVICE_ACCOUNT_EMAIL}\""
-
-TERRAFORM_VAR_ARGS+=" -var \"policy_bucket_name=${POLICY_BUCKET}\""
-TERRAFORM_VAR_ARGS+=" -var \"request_bucket_name=${REQUEST_BUCKET}\""
-
-TERRAFORM_VAR_ARGS+=" -var \"pubsub_cmd_topic_id=${PUBSUB_CMD_TOPIC}\""
-TERRAFORM_VAR_ARGS+=" -var \"pubsub_err_topic_id=${PUBSUB_ERROR_TOPIC}\""
-TERRAFORM_VAR_ARGS+=" -var \"pubsub_bq_notification_topic_id=${PUBSUB_BQ_NOTIFICATION_TOPIC}\""
-
-TERRAFORM_VAR_ARGS+=" -var \"monitoring_channel_name=${ERROR_MONITORING_CHANNEL}\""
-TERRAFORM_VAR_ARGS+=" -var \"notification_monitoring_channel_name=${NOTIFICAITON_ERROR_MONITORING_CHANNEL}\""
-
-echo "Terraform plan arguments: ${TERRAFORM_VAR_ARGS}"
-```
-
 ## Enable APIs
 
 ```bash
@@ -87,6 +24,68 @@ gcloud services enable \
 
 ```bash
 terraform init
+```
+
+## Definitions
+
+From own Infrastructure:
+```bash
+pushd ../1_source
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export SAMPLER_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.sampler_function_service_account.value.email' ${OUT_JSON})
+export NOTIFICATION_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.notification_function_service_account.value.email' ${OUT_JSON})
+export PUBSUB_CMD_SERVICE_ACCOUNT_EMAIL=$(jq -c -r '.cmd_pubsub_service_account.value.email' ${OUT_JSON})
+
+export POLICY_BUCKET=$(jq -c -r '.policy_bucket.value.name' ${OUT_JSON})
+
+export PUBSUB_CMD_TOPIC_ID=$(jq -c -r '.pubsub_cmd.value.id' ${OUT_JSON})
+export PUBSUB_ERROR_TOPIC_ID=$(jq -c -r '.pubsub_err.value.id' ${OUT_JSON})
+
+export ERROR_MONITORING_CHANNEL=$(jq -c -r '.error_monitoring_channel.value.display_name' ${OUT_JSON})
+export NOTIFICAITON_ERROR_MONITORING_CHANNEL=$(jq -c -r '.notification_error_monitoring_channel.value.display_name' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+From target project:
+```bash
+pushd ../2_target
+OUT_JSON=$(mktemp)
+terraform output -json > ${OUT_JSON}
+echo "Terraform output in ${OUT_JSON}"
+
+export REQUEST_BUCKET=$(jq -c -r '.request_bucket.value.name' ${OUT_JSON})
+export PUBSUB_BQ_NOTIFICATION_TOPIC_ID=$(jq -c -r '.pubsub_bq_notification.value.id' ${OUT_JSON})
+rm -f ${OUT_JSON}
+popd 
+```
+
+### Terraform Arguments
+
+```bash
+TERRAFORM_VAR_ARGS="-var \"project_id=${PROJECT_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"target_project_id=${TARGET_PROJECT_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
+TERRAFORM_VAR_ARGS+=" -var \"bq_target_location=${BQ_TARGET_REGION}\""
+
+TERRAFORM_VAR_ARGS+=" -var \"sampler_service_account_email=${SAMPLER_SERVICE_ACCOUNT_EMAIL}\""
+TERRAFORM_VAR_ARGS+=" -var \"notification_function_service_account_email=${NOTIFICATION_SERVICE_ACCOUNT_EMAIL}\""
+TERRAFORM_VAR_ARGS+=" -var \"pubsub_cmd_service_account_email=${PUBSUB_CMD_SERVICE_ACCOUNT_EMAIL}\""
+
+TERRAFORM_VAR_ARGS+=" -var \"policy_bucket_name=${POLICY_BUCKET}\""
+TERRAFORM_VAR_ARGS+=" -var \"request_bucket_name=${REQUEST_BUCKET}\""
+
+TERRAFORM_VAR_ARGS+=" -var \"pubsub_cmd_topic_id=${PUBSUB_CMD_TOPIC_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"pubsub_err_topic_id=${PUBSUB_ERROR_TOPIC_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"pubsub_bq_notification_topic_id=${PUBSUB_BQ_NOTIFICATION_TOPIC_ID}\""
+
+TERRAFORM_VAR_ARGS+=" -var \"monitoring_channel_name=${ERROR_MONITORING_CHANNEL}\""
+TERRAFORM_VAR_ARGS+=" -var \"notification_monitoring_channel_name=${NOTIFICAITON_ERROR_MONITORING_CHANNEL}\""
+
+echo "Terraform plan arguments: ${TERRAFORM_VAR_ARGS}"
 ```
 
 ## Plan and Apply
@@ -215,3 +214,5 @@ cat ${CFG_FILE}
 gsutil cp ${CFG_FILE} ${NOTIFICATION_CONFIG_URI}
 rm -f ${CFG_FILE}
 ```
+
+## [Testing](../README.md#testing)

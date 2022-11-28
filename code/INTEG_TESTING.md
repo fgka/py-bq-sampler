@@ -82,7 +82,8 @@ Create custom script:
 ```bash
 SCRIPT_TMP=$(mktemp)
 echo "rm -f integ_test.log" > ${SCRIPT_TMP}
-echo "./bin/manual_integ_tests.sh ${MANUAL_INTEG_TESTS_ARGS}" >> ${SCRIPT_TMP}
+CURR_DIR=$(cd "$(dirname .)"; pwd)
+echo "${CURR_DIR}/bin/manual_integ_tests.sh ${MANUAL_INTEG_TESTS_ARGS}" >> ${SCRIPT_TMP}
 chmod 755 ${SCRIPT_TMP}
 echo "Script in: ${SCRIPT_TMP}"
 cat ${SCRIPT_TMP}

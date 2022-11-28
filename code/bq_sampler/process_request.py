@@ -19,7 +19,7 @@ _BQ_TARGET_LOCATION_ENV_VAR: str = 'BQ_TARGET_LOCATION'  # europe-west3
 _BQ_TRANSFER_NOTIFICATION_TOPIC_ENV_VAR: str = (
     'BQ_TRANSFER_NOTIFICATION_TOPIC'  # projects/py-project-12345/topics/bq-notification-topic-name
 )
-_BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-2_target-project-12345
+_BQ_TARGET_PROJECT_ID_ENV_VAR: str = 'TARGET_PROJECT_ID'  # my-target-project-12345
 _GCS_POLICY_BUCKET_ENV_VAR: str = 'POLICY_BUCKET_NAME'  # my-policy-bucket
 _GCS_DEFAULT_POLICY_OBJECT_PATH_ENV_VAR: str = 'DEFAULT_POLICY_OBJECT_PATH'  # default_policy.json
 _DEFAULT_GCS_DEFAULT_POLICY_OBJECT_PATH: str = 'default_policy.json'
@@ -312,7 +312,6 @@ def _process_sample_start(value: command.CommandSampleStart) -> None:
         notification_pubsub_topic=_general_config().pubsub_bq_notification,
         recreate_table=True,
     )
-    amount_inserted = 0
     if sample_type == table.SortType.RANDOM:
         amount_inserted = sampler_query.create_table_with_random_sample(**kwargs)
     elif sample_type == table.SortType.SORTED:
@@ -357,7 +356,7 @@ def _create_sample_done_cmd(
 def _process_transfer_run_done(value: command.CommandTransferRunDone) -> None:
     # pylint: disable=line-too-long
     """
-    Checks the state and, if successful, removes the transfer config and 3_source dataset.
+    Checks the state and, if successful, removes the transfer config and source dataset.
 
     Example payload::
         {

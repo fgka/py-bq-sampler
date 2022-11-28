@@ -37,7 +37,7 @@ def cli() -> None:
     required=False,
     type=click.File('r'),
     multiple=True,
-    help='Path to 2_target/specific policy/policies '
+    help='Path to target/specific policy/policies '
     'You can chain multiple policies by just adding "--policy <FILENAME>"',
 )
 @click.option(
@@ -45,7 +45,7 @@ def cli() -> None:
     required=False,
     type=click.Path(exists=True, readable=True, dir_okay=True, file_okay=False),
     multiple=False,
-    help='Path to 2_target/specific policies\' directory '
+    help='Path to target/specific policies\' directory '
     'It can NOT be augmented with "--policy <FILENAME>"',
 )
 @click.option(
@@ -185,7 +185,7 @@ def _print_policy_request_pair(value: policy_.Policy, tbl_sample: table.Sample) 
 
 
 @cli.command(
-    help='Compute the end policy first based on default and 2_target '
+    help='Compute the end policy first based on default and target '
     'and validate the request against. '
     'It prints out the actual request after policy compliance.'
 )
@@ -197,7 +197,7 @@ def _print_policy_request_pair(value: policy_.Policy, tbl_sample: table.Sample) 
     '-p',
     required=True,
     type=click.File('r'),
-    help='Path to 2_target/specific policy/policies.',
+    help='Path to target/specific policy/policies.',
 )
 @click.option(
     '--size',
@@ -207,7 +207,7 @@ def _print_policy_request_pair(value: policy_.Policy, tbl_sample: table.Sample) 
     help='Table size against which the compliance of the policy will be checked. '
     'Must be greater than 0.',
 )
-@click.option('--request', '-r', required=True, type=click.File('r'), help='Path to 2_target request')
+@click.option('--request', '-r', required=True, type=click.File('r'), help='Path to target request')
 def sample_request(  # pylint: disable=redefined-outer-name
     default: io.TextIOWrapper, policy: io.TextIOWrapper, size: int, request: io.TextIOWrapper
 ) -> None:
@@ -299,23 +299,23 @@ class GroupWithCommandOptions(click.Group):
 
 @cli.group(cls=GroupWithCommandOptions, help='Lets you sample a table.')
 @click.option(
-    '--3_source',
+    '--source',
     required=False,
     type=str,
-    help='BigQuery 3_source table in the format: <PROJECT>.<DATASET>.<TABLE>',
+    help='BigQuery source table in the format: <PROJECT>.<DATASET>.<TABLE>',
 )
 @click.option(
-    '--2_target',
+    '--target',
     required=False,
     type=str,
-    help='BigQuery 2_target table in the format: <PROJECT>.<DATASET>.<TABLE>',
+    help='BigQuery target table in the format: <PROJECT>.<DATASET>.<TABLE>',
 )
 @click.option(
     '--amount',
     default=1,
     required=False,
     type=int,
-    help='How many rows to copy from 3_source to 2_target',
+    help='How many rows to copy from source to target',
 )
 @click.pass_context
 def sample(  # pylint: disable=unused-argument

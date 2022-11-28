@@ -172,7 +172,7 @@ def create_table_with_random_sample(
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
-    Will create the 2_target table and put the 3_source table sample directly into it.
+    Will create the target table and put the source table sample directly into it.
     See :py:func:`random_sample` for details in the sampling strategy.
 
     :param source_table_ref:
@@ -228,7 +228,7 @@ def _validate_table_to_table_sample(
     _validate_table_reference('source_table_ref', source_table_ref)
     _validate_table_reference('target_table_ref', target_table_ref)
     _LOGGER.warning(
-        'Source <%s> and 2_target <%s> tables are not in the same location. '
+        'Source <%s> and target <%s> tables are not in the same location. '
         'It will increase costs.',
         source_table_ref,
         target_table_ref,
@@ -294,14 +294,14 @@ def _pre_sample_setup(
     labels: Optional[Dict[str, str]] = None,
     recreate_table: Optional[bool] = True,
 ) -> table.TableReference:
-    # create 2_target table
+    # create target table
     _create_table(
         source_table_fqn_id=source_table_ref.table_fqn_id(),
         target_table_fqn_id=target_table_ref.table_fqn_id(),
         labels=labels,
         recreate_table=recreate_table,
     )
-    # return 2_target staging table
+    # return target staging table
     return _staging_target_table_ref(
         source_table_ref=source_table_ref,
         target_table_ref=target_table_ref,
@@ -348,6 +348,11 @@ def _staging_target_table_ref(
             target_table_fqn_id=result.table_fqn_id(),
             labels=labels,
             recreate_table=recreate_table,
+        )
+        _LOGGER.info(
+            "Defined staging target for x-location sampling. Staging: %s. Actual Target: %s",
+            result,
+            target_table_ref,
         )
     return result
 
@@ -442,7 +447,7 @@ def _sample_query_execution(
                 f'Error: {err_query}'
             ) from err_query
     if staging_target_table_ref != target_table_ref:
-        # since there was a staging table, we need to transfer to the 2_target table
+        # since there was a staging table, we need to transfer to the target table
         _transfer_content_x_location(
             source_table_ref=staging_target_table_ref,
             target_table_ref=target_table_ref,
@@ -477,7 +482,7 @@ def create_table_with_sorted_sample(
     recreate_table: Optional[bool] = True,
 ) -> int:
     """
-    Will create the 2_target table and put the 3_source table sample directly into it.
+    Will create the target table and put the source table sample directly into it.
     See :py:func:`sorted_sample` for details in the sampling strategy.
 
     :param source_table_ref:

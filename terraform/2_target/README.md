@@ -2,8 +2,25 @@
 
 Start at the parent [../README.md](../README.md)
 
-## Definitions
+## Enable APIs
 
+```bash
+gcloud services enable \
+  bigquery.googleapis.com \
+  iam.googleapis.com \
+  logging.googleapis.com \
+  pubsub.googleapis.com \
+  storage.googleapis.com \
+  --project="${TARGET_PROJECT_ID}"
+```
+
+## Init
+
+```bash
+terraform init
+```
+
+## Definitions
 
 ```bash
 pushd ../1_source
@@ -24,24 +41,6 @@ TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
 TERRAFORM_VAR_ARGS+=" -var \"sampler_service_account_email=${SAMPLER_SERVICE_ACCOUNT_EMAIL}\""
 
 echo "Terraform arguments: ${TERRAFORM_VAR_ARGS}"
-```
-
-## Enable APIs
-
-```bash
-gcloud services enable \
-  bigquery.googleapis.com \
-  iam.googleapis.com \
-  logging.googleapis.com \
-  pubsub.googleapis.com \
-  storage.googleapis.com \
-  --project="${TARGET_PROJECT_ID}"
-```
-
-## Init
-
-```bash
-terraform init
 ```
 
 ## Plan and Apply

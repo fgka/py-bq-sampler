@@ -66,10 +66,10 @@ resource "google_pubsub_subscription" "pubsub_cmd_sampler" {
   name  = "${var.sampler_function_name}_http_cmd_push_subscription"
   topic = var.pubsub_cmd_topic_id
   push_config {
-    push_endpoint = module.sampler.function.https_trigger_url
+    push_endpoint = module.sampler.uri
     oidc_token {
       service_account_email = data.google_service_account.cmd_pubsub_service_account.email
-      audience              = module.sampler.function.https_trigger_url
+      audience              = module.sampler.uri
     }
   }
   ack_deadline_seconds       = var.sampler_function_timeout
@@ -85,10 +85,10 @@ resource "google_pubsub_subscription" "pubsub_bq_notification_sampler" {
   topic   = var.pubsub_bq_notification_topic_id
   project = var.project_id
   push_config {
-    push_endpoint = module.sampler.function.https_trigger_url
+    push_endpoint = module.sampler.uri
     oidc_token {
       service_account_email = data.google_service_account.cmd_pubsub_service_account.email
-      audience              = module.sampler.function.https_trigger_url
+      audience              = module.sampler.uri
     }
   }
   ack_deadline_seconds       = var.sampler_function_timeout
@@ -107,13 +107,14 @@ module "sampler" {
   project_id      = var.project_id
   region          = var.region
   name            = var.sampler_function_name
+  v2              = true
   service_account = data.google_service_account.sampler_service_account.email
   function_config = {
-    entry_point = var.sampler_function_handler
-    runtime     = var.function_runtime
-    instances   = var.sampler_function_max_instances
-    memory      = var.sampler_function_memory
-    timeout     = var.sampler_function_timeout
+    entry_point     = var.sampler_function_handler
+    runtime         = var.function_runtime
+    instance_count  = var.sampler_function_max_instances
+    memory_mb       = var.sampler_function_memory
+    timeout_seconds = var.sampler_function_timeout
   }
   environment_variables = {
     BQ_TARGET_LOCATION             = local.bq_target_location
@@ -130,7 +131,7 @@ module "sampler" {
   trigger_config = {
     v1 = null // forces HTTP
   }
-  ingress_settings = "ALLOW_ALL" # YES, Cloud Functions V1 HTTP trigger needs to allow all for pubsub HTTP push subscription
+  ingress_settings = "ALLOW_INTERNAL_AND_GCLB"
   bucket_name      = data.google_storage_bucket.policy_bucket.name
   bundle_config = {
     source_dir  = "../../code"
@@ -138,10 +139,38 @@ module "sampler" {
     excludes    = local.function_source_exclude
   }
   iam = {
-    "roles/cloudfunctions.invoker" = [data.google_service_account.cmd_pubsub_service_account.member]
+    "roles/cloudfunctions.invoker" = [
+      // pubsub SA
+      data.google_service_account.cmd_pubsub_service_account.member,
+      // function SA
+      data.google_service_account.sampler_service_account.member,
+    ]
+    "roles/cloudfunctions.serviceAgent" = [
+      // function SA
+      data.google_service_account.sampler_service_account.member,
+    ]
   }
 }
 
+// Cloud Run backend permissions
+
+// function SA
+resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_agent" {
+  service  = module.sampler.function.service_config[0].service
+  location = var.region
+  role     = "roles/run.serviceAgent"
+  member   = data.google_service_account.sampler_service_account.member
+}
+
+// pubsub SA
+resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_pubsub_invoker" {
+  service  = module.sampler.function.service_config[0].service
+  location = var.region
+  role     = "roles/run.invoker"
+  member   = data.google_service_account.cmd_pubsub_service_account.member
+}
+
+// Notification Function
 module "notification" {
   source          = "github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/cloud-function"
   project_id      = var.project_id
@@ -149,11 +178,11 @@ module "notification" {
   name            = local.notification_function_name
   service_account = data.google_service_account.notification_function_service_account.email
   function_config = {
-    entry_point = local.notification_handler
-    runtime     = var.function_runtime
-    instances   = var.notification_function_max_instances
-    memory      = 256
-    timeout     = 180
+    entry_point     = local.notification_handler
+    runtime         = var.function_runtime
+    instance_count  = var.notification_function_max_instances
+    memory_mb       = 256
+    timeout_seconds = 180
   }
   environment_variables = local.notification_env_vars
   bucket_name           = data.google_storage_bucket.policy_bucket.name

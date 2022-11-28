@@ -3,7 +3,7 @@
 ////////////////////
 
 locals {
-  request_bucket_name = "${var.request_bucket_name_prefix}-${data.google_project.project.number}"
+  request_bucket_name            = "${var.request_bucket_name_prefix}-${data.google_project.project.number}"
   bigquery_datatransfer_sa_email = "service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
 }
 
@@ -33,15 +33,13 @@ resource "google_service_account_iam_member" "sampler_service_account_cross_proj
 
 // BigQuery
 
-resource "google_project_iam_member" "project_iam_bq_data" {
+resource "google_project_iam_member" "project_iam_bq" {
+  for_each = toset([
+    "roles/bigquery.admin",
+    "roles/bigquery.jobUser",
+  ])
   project = var.project_id
-  role    = "roles/bigquery.admin"
-  member  = data.google_service_account.sampler_service_account.member
-}
-
-resource "google_project_iam_member" "project_iam_bq_job" {
-  project = var.project_id
-  role    = "roles/bigquery.jobUser"
+  role    = each.key
   member  = data.google_service_account.sampler_service_account.member
 }
 

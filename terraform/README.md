@@ -100,8 +100,8 @@ gcloud logging read \
 
 Trigger sampling:
 ```bash
-PUBSUB_SENT_DATE=$(date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
-LOG_QUERY_SUFFIX="severity>=INFO timestamp>=\"${PUBSUB_SENT_DATE}\""
+SCHED_TRIGGER_DATE=$(date -u -v-1M +"%Y-%m-%dT%H:%M:%SZ")
+LOG_QUERY_SUFFIX="severity>=INFO timestamp>=\"${SCHED_TRIGGER_DATE}\""
 JQ_QUERY='.[] | (.timestamp + " - " + .textPayload)'
 gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
   --project="${PROJECT_ID}" \
@@ -111,7 +111,7 @@ gcloud beta scheduler jobs run ${SCHEDULER_JOB_NAME} \
 Check logs:
 ```bash
 gcloud logging read \
-  "resource.labels.function_name=${FUNCTION_NAME} ${LOG_QUERY_SUFFIX}" \
+  "(resource.labels.function_name=${FUNCTION_NAME} OR resource.labels.service_name=${FUNCTION_NAME}) ${LOG_QUERY_SUFFIX}" \
   --format=json \
   --project="${PROJECT_ID}" \
   | jq -cr ${JQ_QUERY} \
@@ -119,41 +119,6 @@ gcloud logging read \
 ```
 
 ## Integration tests
-
-There a couple of things you need to do before jumping into executing the integration tests:
-* Set some environment variables;
-* Trigger the BigQuery cloning jobs and wait for them to finish;
-* Execute the integration tests.
-
-### Set environment variables
-
-PubSub, Scheduler, and Transfer:
-```bash
-pushd ./1_source
-OUT_JSON=$(mktemp)
-terraform output -json > ${OUT_JSON}
-echo "Terraform output in ${OUT_JSON}"
-
-export PUBSUB_CMD_TOPIC=$(jq -c -r '.pubsub_cmd.value.name' ${OUT_JSON})
-export PUBSUB_ERROR_TOPIC=$(jq -c -r '.pubsub_err.value.name' ${OUT_JSON})
-export SCHEDULER_JOB_NAME=$(jq -c -r '.trigger_job.value.name' ${OUT_JSON})
-rm -f ${OUT_JSON}
-popd 
-```
-
-Functions:
-```bash
-pushd ./3_source
-OUT_JSON=$(mktemp)
-terraform output -json > ${OUT_JSON}
-echo "Terraform output in ${OUT_JSON}"
-
-export FUNCTION_NAME=$(jq -c -r '.sampler_function.value.name' ${OUT_JSON})
-export POLICY_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.POLICY_BUCKET_NAME' ${OUT_JSON})
-export REQUEST_BUCKET_NAME=$(jq -c -r '.sampler_function.value.environment_variables.REQUEST_BUCKET_NAME' ${OUT_JSON})
-rm -f ${OUT_JSON}
-popd
-```
 
 ### [Trigger BigQuery cloning jobs](./1_source/README.md)
 

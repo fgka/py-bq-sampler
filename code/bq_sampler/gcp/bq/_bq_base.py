@@ -7,6 +7,7 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 .. Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
+import time
 from typing import Any, Callable, Dict, Generator, Mapping, Optional, Sequence, Tuple, Union
 
 import cachetools
@@ -19,6 +20,9 @@ from google.protobuf import field_mask_pb2, struct_pb2, timestamp_pb2
 from bq_sampler import const, logger
 
 _LOGGER = logger.get(__name__)
+
+_QUERY_JOB_DONE_STATE: str = "DONE"
+_QUERY_JOB_BUSY_WAIT_SLEEP_TIME_IN_SECONDS: int = 15
 
 
 class _SimpleTableSpec:  # pylint: disable=too-few-public-methods
@@ -161,13 +165,7 @@ def query_job(
     location = _stripped_str_arg('location', location, True)
     # logic
     result = _query_job(query, job_config, project_id, location)
-    _LOGGER.debug(
-        'Query <%s> stats: total bytes processed %s; total bytes billed %s; slot milliseconds: %s.',
-        _query_job_to_log_str(result),
-        result.total_bytes_processed,
-        result.total_bytes_billed,
-        result.slot_millis,
-    )
+    _LOGGER.debug('Query job <%s>.', result)
     return result
 
 
@@ -188,15 +186,6 @@ def _query_job(
             f'Error: {err}'
         ) from err
     return result
-
-
-def _query_job_to_log_str(query_job_: bigquery.job.query.QueryJob) -> str:
-    """
-    Two reasons for this:
-    1- f-strings do not allow '\' in the parameters;
-    2- standard way to report query job's query in the logs.
-    """
-    return query_job_.query.replace('\n', '').strip() + f' -> {query_job_.query_parameters}'
 
 
 def create_table(
@@ -636,7 +625,7 @@ def dataset_transfer_config_run(
     """
     # pylint: enable=line-too-long
     _LOGGER.warning(
-        'Cross location copy is expensive, consider relocating 3_source table. '
+        'Cross location copy is expensive, consider relocating source table. '
         'Copying from <%s> into <%s> with done notification sent to <%s>',
         source_table_fqn_id,
         target_table_fqn_id,

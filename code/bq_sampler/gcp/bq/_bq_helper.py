@@ -84,10 +84,27 @@ def query_job_result(
         raise RuntimeError(
             f'Could not retrieve results from query <{job.query}>. Error: {err}'
         ) from err
-    _LOGGER.debug(
-        'Issued query job results for query <%s> in project <%s>@<%s>', query, project_id, location
+    _LOGGER.info(
+        'Query <%s> stats: '
+        'total bytes processed %s; '
+        'total bytes billed %s; '
+        'slot milliseconds: %s.',
+        _query_from_job_to_log_str(job),
+        job.total_bytes_processed,
+        job.total_bytes_billed,
+        job.slot_millis,
     )
+    _LOGGER.debug('Query Job <%s> results: <%s>', job, result)
     return result
+
+
+def _query_from_job_to_log_str(query_job_: bigquery.job.query.QueryJob) -> str:
+    """
+    Two reasons for this:
+    1- f-strings do not allow '\' in the parameters;
+    2- standard way to report query job's query in the logs.
+    """
+    return query_job_.query.replace('\n', '').strip() + f' -> {query_job_.query_parameters}'
 
 
 def drop_all_tables_by_labels(*, project_id: str, labels: Optional[Dict[str, str]] = None) -> None:
