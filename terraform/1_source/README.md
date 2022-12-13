@@ -6,6 +6,7 @@ Start at the parent [../README.md](../README.md)
 
 ```bash
 gcloud services enable \
+  artifactregistry.googleapis.com \
   bigquery.googleapis.com \
   bigquerydatatransfer.googleapis.com \
   cloudbuild.googleapis.com \
@@ -15,6 +16,7 @@ gcloud services enable \
   logging.googleapis.com \
   monitoring.googleapis.com \
   pubsub.googleapis.com \
+  run.googleapis.com \
   secretmanager.googleapis.com \
   storage.googleapis.com \
   --project="${PROJECT_ID}"

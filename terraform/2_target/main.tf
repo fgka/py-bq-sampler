@@ -3,8 +3,14 @@
 ////////////////////
 
 locals {
-  request_bucket_name            = "${var.request_bucket_name_prefix}-${data.google_project.project.number}"
-  bigquery_datatransfer_sa_email = "service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+  request_bucket_name             = "${var.request_bucket_name_prefix}-${data.google_project.project.number}"
+  bigquery_datatransfer_sa_email  = "service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+  bigquery_datatransfer_sa_member = "serviceAccount:${local.bigquery_datatransfer_sa_email}"
+  sampler_service_account_member  = "serviceAccount:${var.sampler_service_account_email}"
+  service_account_member_map = tomap({
+    sampler     = local.sampler_service_account_member
+    bq_transfer = local.bigquery_datatransfer_sa_member
+  })
 }
 
 data "google_project" "project" {
@@ -13,10 +19,6 @@ data "google_project" "project" {
 
 data "google_service_account" "sampler_service_account" {
   account_id = var.sampler_service_account_email
-}
-
-data "google_service_account" "bigquery_datatransfer_service_account" {
-  account_id = local.bigquery_datatransfer_sa_email
 }
 
 /////////////////////////////////
@@ -28,7 +30,7 @@ data "google_service_account" "bigquery_datatransfer_service_account" {
 resource "google_service_account_iam_member" "sampler_service_account_cross_project_token" {
   service_account_id = data.google_service_account.sampler_service_account.id
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = data.google_service_account.bigquery_datatransfer_service_account.member
+  member             = local.bigquery_datatransfer_sa_member
 }
 
 // BigQuery
@@ -40,19 +42,16 @@ resource "google_project_iam_member" "project_iam_bq" {
   ])
   project = var.project_id
   role    = each.key
-  member  = data.google_service_account.sampler_service_account.member
+  member  = local.sampler_service_account_member
 }
 
 // BQ Transfer agent
 
 resource "google_project_iam_member" "project_iam_bq_transfer_agent" {
-  for_each = toset([
-    data.google_service_account.bigquery_datatransfer_service_account.member,
-    data.google_service_account.sampler_service_account.member,
-  ])
-  project = var.project_id
-  role    = "roles/bigquerydatatransfer.serviceAgent"
-  member  = each.key
+  for_each = local.service_account_member_map
+  project  = var.project_id
+  role     = "roles/bigquerydatatransfer.serviceAgent"
+  member   = each.value
 }
 
 // Service usage
@@ -60,7 +59,7 @@ resource "google_project_iam_member" "project_iam_bq_transfer_agent" {
 resource "google_project_iam_member" "project_iam_service_usage" {
   project = var.project_id
   role    = "roles/serviceusage.serviceUsageConsumer"
-  member  = data.google_service_account.sampler_service_account.member
+  member  = local.sampler_service_account_member
 }
 
 /////////
@@ -72,8 +71,8 @@ module "request_bucket" {
   project_id = var.project_id
   name       = local.request_bucket_name
   iam = {
-    "roles/storage.legacyBucketReader" = [data.google_service_account.sampler_service_account.member]
-    "roles/storage.objectViewer"       = [data.google_service_account.sampler_service_account.member]
+    "roles/storage.legacyBucketReader" = [local.sampler_service_account_member]
+    "roles/storage.objectViewer"       = [local.sampler_service_account_member]
   }
 }
 
@@ -86,7 +85,7 @@ module "pubsub_bq_notification" {
   project_id = var.project_id
   name       = var.pubsub_bq_notification_topic_name
   iam = {
-    "roles/pubsub.admin" = [data.google_service_account.sampler_service_account.member]
+    "roles/pubsub.admin" = [local.sampler_service_account_member]
   }
 }
 
