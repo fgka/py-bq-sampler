@@ -3,13 +3,13 @@
 /////////////
 
 output "source_1" {
-  source = "./1_source"
+  value = module.source_1
 }
 
 output "target_2" {
-  source = "./2_target"
+  value = module.target_2
 }
 
 output "source_3" {
-  source = "./3_source"
+  value     = module.source_3
 }
