@@ -4,7 +4,7 @@
 
 locals {
   // from 2_target project
-  bq_target_location = var.bq_target_location != null ? var.bq_target_location : var.region
+  bq_target_location = coalesce(var.bq_target_location, var.region)
   // notification function
   notification_function_name = "${var.notification_function_name_prefix}${lower(var.notification_function_type)}"
   notification_handler       = "${var.notification_function_handler_prefix}${lower(var.notification_function_type)}"
@@ -19,30 +19,10 @@ locals {
   function_source_exclude = flatten([
     for in_file in var.function_bundle_exclude_list_files : split("\n", file(in_file))
   ])
-}
-
-data "google_project" "project" {
-  project_id = var.project_id
-}
-
-data "google_project" "target_project" {
-  project_id = var.target_project_id
-}
-
-//////////////////////
-// Service Account  //
-//////////////////////
-
-data "google_service_account" "sampler_service_account" {
-  account_id = var.sampler_service_account_email
-}
-
-data "google_service_account" "notification_function_service_account" {
-  account_id = var.notification_function_service_account_email
-}
-
-data "google_service_account" "cmd_pubsub_service_account" {
-  account_id = var.pubsub_cmd_service_account_email
+  // service account members
+  sampler_service_account_member               = "serviceAccount:${var.sampler_service_account_email}"
+  notification_function_service_account_member = "serviceAccount:${var.notification_function_service_account_email}"
+  pubsub_cmd_service_account_member            = "serviceAccount:${var.pubsub_cmd_service_account_email}"
 }
 
 /////////
@@ -68,7 +48,7 @@ resource "google_pubsub_subscription" "pubsub_cmd_sampler" {
   push_config {
     push_endpoint = module.sampler.uri
     oidc_token {
-      service_account_email = data.google_service_account.cmd_pubsub_service_account.email
+      service_account_email = var.pubsub_cmd_service_account_email
       audience              = module.sampler.uri
     }
   }
@@ -87,7 +67,7 @@ resource "google_pubsub_subscription" "pubsub_bq_notification_sampler" {
   push_config {
     push_endpoint = module.sampler.uri
     oidc_token {
-      service_account_email = data.google_service_account.cmd_pubsub_service_account.email
+      service_account_email = var.pubsub_cmd_service_account_email
       audience              = module.sampler.uri
     }
   }
@@ -108,7 +88,7 @@ module "sampler" {
   region          = var.region
   name            = var.sampler_function_name
   v2              = true
-  service_account = data.google_service_account.sampler_service_account.email
+  service_account = var.sampler_service_account_email
   function_config = {
     entry_point     = var.sampler_function_handler
     runtime         = var.function_runtime
@@ -134,20 +114,20 @@ module "sampler" {
   ingress_settings = "ALLOW_INTERNAL_AND_GCLB"
   bucket_name      = data.google_storage_bucket.policy_bucket.name
   bundle_config = {
-    source_dir  = "../../code"
+    source_dir  = var.code_dir
     output_path = "dist/${var.sampler_function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
   iam = {
     "roles/cloudfunctions.invoker" = [
       // pubsub SA
-      data.google_service_account.cmd_pubsub_service_account.member,
+      local.pubsub_cmd_service_account_member,
       // function SA
-      data.google_service_account.sampler_service_account.member,
+      local.sampler_service_account_member,
     ]
     "roles/cloudfunctions.serviceAgent" = [
       // function SA
-      data.google_service_account.sampler_service_account.member,
+      local.sampler_service_account_member,
     ]
   }
 }
@@ -159,7 +139,7 @@ resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_
   service  = module.sampler.function.service_config[0].service
   location = var.region
   role     = "roles/run.serviceAgent"
-  member   = data.google_service_account.sampler_service_account.member
+  member   = local.sampler_service_account_member
 }
 
 // pubsub SA
@@ -167,7 +147,7 @@ resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_
   service  = module.sampler.function.service_config[0].service
   location = var.region
   role     = "roles/run.invoker"
-  member   = data.google_service_account.cmd_pubsub_service_account.member
+  member   = local.sampler_service_account_member
 }
 
 // Notification Function
@@ -176,7 +156,7 @@ module "notification" {
   project_id      = var.project_id
   region          = var.region
   name            = local.notification_function_name
-  service_account = data.google_service_account.notification_function_service_account.email
+  service_account = var.notification_function_service_account_email
   function_config = {
     entry_point     = local.notification_handler
     runtime         = var.function_runtime
@@ -187,7 +167,7 @@ module "notification" {
   environment_variables = local.notification_env_vars
   bucket_name           = data.google_storage_bucket.policy_bucket.name
   bundle_config = {
-    source_dir  = "../../code"
+    source_dir  = var.code_dir
     output_path = "dist/${local.notification_function_name}-bundle.zip"
     excludes    = local.function_source_exclude
   }
@@ -303,7 +283,7 @@ module "notification_secret" {
   }
   iam = {
     "${local.notification_secret_name}" = {
-      "roles/secretmanager.secretAccessor" = [data.google_service_account.notification_function_service_account.member]
+      "roles/secretmanager.secretAccessor" = [local.notification_function_service_account_member]
     }
   }
 }

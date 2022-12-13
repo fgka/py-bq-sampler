@@ -2,6 +2,13 @@
 // Global/General //
 ////////////////////
 
+locals {
+  sampler_service_account_member               = "serviceAccount:${module.sampler_service_account.email}"
+  notification_function_service_account_member = "serviceAccount:${module.notification_function_service_account.email}"
+  bigquery_datatransfer_sa_email               = "service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+  bigquery_datatransfer_sa_member              = "serviceAccount:${local.bigquery_datatransfer_sa_email}"
+}
+
 data "google_project" "project" {
   project_id = var.project_id
 }
@@ -37,6 +44,12 @@ module "cmd_pubsub_service_account" {
   generate_key = false
 }
 
+resource "google_service_account_iam_member" "sampler_service_account_cross_project_token" {
+  service_account_id = module.sampler_service_account.id
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = local.bigquery_datatransfer_sa_member
+}
+
 /////////
 // GCS //
 /////////
@@ -48,12 +61,12 @@ module "policy_bucket" {
   name       = data.google_project.project.number
   iam = {
     "roles/storage.objectViewer" = [
-      "serviceAccount:${module.sampler_service_account.email}",
-      "serviceAccount:${module.notification_function_service_account.email}",
+      local.sampler_service_account_member,
+      local.notification_function_service_account_member,
     ]
     "roles/storage.legacyBucketReader" = [
-      "serviceAccount:${module.sampler_service_account.email}",
-      "serviceAccount:${module.notification_function_service_account.email}",
+      local.sampler_service_account_member,
+      local.notification_function_service_account_member,
     ]
   }
 }
@@ -67,7 +80,7 @@ module "pubsub_cmd" {
   project_id = var.project_id
   name       = var.pubsub_cmd_topic_name
   iam = {
-    "roles/pubsub.publisher" = [module.sampler_service_account.iam_email]
+    "roles/pubsub.publisher" = [local.sampler_service_account_member]
   }
 }
 
@@ -76,7 +89,7 @@ module "pubsub_err" {
   project_id = var.project_id
   name       = var.pubsub_error_topic_name
   iam = {
-    "roles/pubsub.publisher" = [module.sampler_service_account.iam_email]
+    "roles/pubsub.publisher" = [local.sampler_service_account_member]
   }
 }
 
@@ -88,7 +101,6 @@ resource "google_cloud_scheduler_job" "trigger_job" {
   name        = var.scheduler_name
   description = "Cronjob to trigger BigQuery sampling to Target Environment"
   schedule    = var.scheduler_cron_entry
-
   pubsub_target {
     topic_name = module.pubsub_cmd.id
     data       = base64encode(var.scheduler_data)
@@ -159,5 +171,5 @@ resource "google_project_iam_member" "schedule_permissions" {
   count   = var.create_integ_test_data ? 1 : 0
   project = var.project_id
   role    = "roles/iam.serviceAccountShortTermTokenMinter"
-  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+  member  = local.bigquery_datatransfer_sa_member
 }

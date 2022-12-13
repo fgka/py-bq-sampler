@@ -7,6 +7,7 @@ Start at the parent [../README.md](../README.md)
 ```bash
 gcloud services enable \
   bigquery.googleapis.com \
+  bigquerydatatransfer.googleapis.com \
   iam.googleapis.com \
   logging.googleapis.com \
   pubsub.googleapis.com \
