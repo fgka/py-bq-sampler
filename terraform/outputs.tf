@@ -11,5 +11,5 @@ output "target_2" {
 }
 
 output "source_3" {
-  value     = module.source_3
+  value = module.source_3
 }
