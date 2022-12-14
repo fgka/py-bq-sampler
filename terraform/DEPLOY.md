@@ -1,16 +1,16 @@
-# Using Terraform to deploy Infrastructure for Functions
+# Deploying All Using The Root Module
 
-Start at the parent [../README.md](../README.md)
+It is assumed you followed the instructions in [README.md](./README.md).
 
 ## Definitions
 
-### Without integration test data
+### Without Integration Test Data
 
 ```bash
 export CREATE_INTEG_TESTS="false" 
 ```
 
-### With integration test data
+### With Integration Test Data
 
 ```bash
 export CREATE_INTEG_TESTS="true" 
@@ -20,13 +20,16 @@ export CREATE_INTEG_TESTS="true"
 
 ```bash
 TERRAFORM_VAR_ARGS="-var \"project_id=${PROJECT_ID}\""
+TERRAFORM_VAR_ARGS+=" -var \"target_project_id=${TARGET_PROJECT_ID}\""
 TERRAFORM_VAR_ARGS+=" -var \"region=${REGION}\""
+TERRAFORM_VAR_ARGS+=" -var \"bq_target_location=${BQ_TARGET_REGION}\""
 TERRAFORM_VAR_ARGS+=" -var \"notification_monitoring_email_address=${ERROR_NOTIFICATION_EMAIL_ADDRESS}\""
 TERRAFORM_VAR_ARGS+=" -var \"create_integ_test_data=${CREATE_INTEG_TESTS}\""
 
 echo "Terraform arguments: ${TERRAFORM_VAR_ARGS}"
 ```
-## Plan and Apply
+
+## Plan And Apply
 
 ```bash
 TMP=$(mktemp)
@@ -43,7 +46,7 @@ OUT_JSON=$(mktemp)
 terraform output -json > ${OUT_JSON}
 echo "Terraform output in ${OUT_JSON}"
 
-jq -r '.integ_test_data_transfer.value[].name' ${OUT_JSON} \
+jq -r '.source_1.value.integ_test_data_transfer[].name' ${OUT_JSON} \
   | while read TRANSFER_NAME
     do
       echo "Triggering transfer config: ${TRANSFER_NAME}"
@@ -56,4 +59,4 @@ jq -r '.integ_test_data_transfer.value[].name' ${OUT_JSON} \
 rm -f ${OUT_JSON}
 ```
 
-## [Deploy Target Project](../2_target/README.md)
+## [Testing](./TESTING.md)
