@@ -50,7 +50,7 @@ output "notification_alert_error_log_policy" {
 // Secret Manager //
 ////////////////////
 
-output "notification_secret_ids" {
-  value     = module.notification_secret.ids
+output "notification_secret_versions" {
+  value     = module.notification_secret.version_ids
   sensitive = false
 }

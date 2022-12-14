@@ -135,7 +135,7 @@ module "sampler" {
 // Cloud Run backend permissions
 
 // function SA
-resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_agent" {
+resource "google_cloud_run_service_iam_member" "sampler_fn_v2_run_agent" {
   service  = module.sampler.function.service_config[0].service
   location = var.region
   role     = "roles/run.serviceAgent"
@@ -143,11 +143,15 @@ resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_
 }
 
 // pubsub SA
-resource "google_cloud_run_service_iam_member" "todo_module_name_todo_fn_v2_run_pubsub_invoker" {
+resource "google_cloud_run_service_iam_member" "sampler_fn_v2_run_invoker" {
+  for_each = toset([
+    local.sampler_service_account_member,
+    local.pubsub_cmd_service_account_member,
+  ])
   service  = module.sampler.function.service_config[0].service
   location = var.region
   role     = "roles/run.invoker"
-  member   = local.sampler_service_account_member
+  member   = each.key
 }
 
 // Notification Function
