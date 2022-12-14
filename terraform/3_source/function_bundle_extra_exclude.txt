@@ -5,6 +5,7 @@ DEVELOPMENT.md
 INFRASTRUCTURE.md
 INTEG_TESTING.md
 README.md
+bin
 bq_sampler/__pycache__
 bq_sampler/entity/__pycache__
 bq_sampler/gcp/__pycache__
