@@ -23,6 +23,10 @@ locals {
   sampler_service_account_member               = "serviceAccount:${var.sampler_service_account_email}"
   notification_function_service_account_member = "serviceAccount:${var.notification_function_service_account_email}"
   pubsub_cmd_service_account_member            = "serviceAccount:${var.pubsub_cmd_service_account_email}"
+  run_invoker_sa_member_map = tomap({
+    sampler    = local.sampler_service_account_member
+    pubsub_cmd = local.pubsub_cmd_service_account_member
+  })
 }
 
 /////////
@@ -111,7 +115,7 @@ module "sampler" {
   trigger_config = {
     v1 = null // forces HTTP
   }
-  ingress_settings = "ALLOW_INTERNAL_AND_GCLB"
+  ingress_settings = "ALLOW_INTERNAL_ONLY"
   bucket_name      = data.google_storage_bucket.policy_bucket.name
   bundle_config = {
     source_dir  = var.code_dir
@@ -144,14 +148,11 @@ resource "google_cloud_run_service_iam_member" "sampler_fn_v2_run_agent" {
 
 // pubsub SA
 resource "google_cloud_run_service_iam_member" "sampler_fn_v2_run_invoker" {
-  for_each = toset([
-    local.sampler_service_account_member,
-    local.pubsub_cmd_service_account_member,
-  ])
+  for_each = local.run_invoker_sa_member_map
   service  = module.sampler.function.service_config[0].service
   location = var.region
   role     = "roles/run.invoker"
-  member   = each.key
+  member   = each.value
 }
 
 // Notification Function
