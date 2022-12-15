@@ -104,7 +104,13 @@ def _query_from_job_to_log_str(query_job_: bigquery.job.query.QueryJob) -> str:
     1- f-strings do not allow '\' in the parameters;
     2- standard way to report query job's query in the logs.
     """
-    return query_job_.query.replace('\n', '').strip() + f' -> {query_job_.query_parameters}'
+    query_str = 'None'
+    if query_job_.query:
+        query_str = query_job_.query.replace('\n', '').strip()
+    query_param_str = 'None'
+    if query_job_.query_parameters:
+        query_param_str = query_job_.query_parameters
+    return f'{query_str} -> {query_param_str}'
 
 
 def drop_all_tables_by_labels(*, project_id: str, labels: Optional[Dict[str, str]] = None) -> None:

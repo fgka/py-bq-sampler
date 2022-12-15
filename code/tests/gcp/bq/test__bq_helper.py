@@ -4,7 +4,7 @@
 # pylint: disable=protected-access,redefined-outer-name,no-self-use,using-constant-test
 # pylint: disable=invalid-name,attribute-defined-outside-init,too-few-public-methods, redefined-builtin
 # type: ignore
-from typing import Dict, Generator, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from google.cloud import bigquery
 
@@ -81,10 +81,18 @@ class _StubQueryJob:
         self,
         *,
         query: Optional[str] = None,
+        query_parameters: Optional[List[Any]] = None,
+        total_bytes_processed: Optional[int] = None,
+        total_bytes_billed: Optional[int] = None,
+        slot_millis: Optional[int] = None,
         result: Optional[bigquery.table.RowIterator] = None,
         result_exception: Optional[Exception] = None,
     ):
         self.query = query
+        self.query_parameters = query_parameters
+        self.total_bytes_processed = total_bytes_processed
+        self.total_bytes_billed = total_bytes_billed
+        self.slot_millis = slot_millis
         self._result = result
         self._result_exception = result_exception
 
