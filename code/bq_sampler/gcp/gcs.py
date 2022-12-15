@@ -3,7 +3,7 @@
 """
 Reads an object from `Cloud Storage`_.
 
-.. Cloud Storage: https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/read-write-to-cloud-storage
+.. _Cloud Storage: https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/read-write-to-cloud-storage
 """
 # pylint: enable=line-too-long
 import logging
@@ -250,7 +250,7 @@ def list_objects(
         result.append('object_a')
         result.append('object_b')
 
-    .. list_blobs: https://googleapis.dev/python/storage/latest/client.html#google.cloud.storage.client.Client.list_blobs
+    .. _list_blobs: https://googleapis.dev/python/storage/latest/client.html#google.cloud.storage.client.Client.list_blobs
     :param bucket_name:
     :param filter_fn:
     :param prefix: limits the search by prefix

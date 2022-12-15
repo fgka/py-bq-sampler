@@ -3,8 +3,8 @@
 """
 Reads an object from `Cloud Big Query`_ using `Python client`_.
 
-.. Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
-.. Python client: https://googleapis.dev/python/bigquery/latest/index.html
+.. _Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
+.. _Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
 import time
@@ -154,7 +154,7 @@ def query_job(
     :param project_id:
     :return:
 
-    .. docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
+    .. _docs: https://googleapis.dev/python/bigquery/latest/reference.html#job
     """
     # validate input
     _LOGGER.debug(
@@ -619,9 +619,9 @@ def dataset_transfer_config_run(
       uses :py:data:`const.TRANSFER_CONFIG_DISPLAY_NAME_PREFIX`.
     :return:
 
-    .. DataTransferServiceClient: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient
-    .. create_transfer_config: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient#google_cloud_bigquery_datatransfer_v1_services_data_transfer_service_DataTransferServiceClient_create_transfer_config
-    .. start_manual_transfer_runs: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient#google_cloud_bigquery_datatransfer_v1_services_data_transfer_service_DataTransferServiceClient_start_manual_transfer_runs
+    .. _DataTransferServiceClient: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient
+    .. _create_transfer_config: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient#google_cloud_bigquery_datatransfer_v1_services_data_transfer_service_DataTransferServiceClient_create_transfer_config
+    .. _start_manual_transfer_runs: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient#google_cloud_bigquery_datatransfer_v1_services_data_transfer_service_DataTransferServiceClient_start_manual_transfer_runs
     """
     # pylint: enable=line-too-long
     _LOGGER.warning(
@@ -714,8 +714,8 @@ def _data_transfer_client(
         py:class:`bigquery_datatransfer.DataTransferServiceClient` auth
         using `auth.default`_.
 
-    .. client: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient
-    .. auth.default: https://google-auth.readthedocs.io/en/master/reference/google.auth.html
+    .. _client: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.services.data_transfer_service.DataTransferServiceClient
+    .. _auth.default: https://google-auth.readthedocs.io/en/master/reference/google.auth.html
     """
     # pylint: enable=line-too-long
     credentials, _ = auth.default(quota_project_id=project_id, scopes=_DATA_TRANSFER_AUTH_SCOPES)
@@ -803,7 +803,7 @@ def _update_transfer_config_request(
     :param transfer_config:
     :param notification_pubsub_topic:
     :return:
-    .. documentation: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.types.UpdateTransferConfigRequest
+    .. _documentation: https://cloud.google.com/python/docs/reference/bigquerydatatransfer/latest/google.cloud.bigquery_datatransfer_v1.types.UpdateTransferConfigRequest
     """
     # pylint: enable=line-too-long
     transfer_config.notification_pubsub_topic = notification_pubsub_topic

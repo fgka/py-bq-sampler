@@ -3,8 +3,8 @@
 """
 Reads an object from `Cloud Big Query`_ using `Python client`_.
 
-.. Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
-.. Python client: https://googleapis.dev/python/bigquery/latest/index.html
+.. _Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
+.. _Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
 import math
@@ -35,8 +35,8 @@ _BQ_RANDOM_SAMPLE_QUERY_RAND_TMPL: str = f"""
 """
 Uses `SELECT`_ statement using `RAND`_ operator.
 
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. RAND: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#rand
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _RAND: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#rand
 """
 # pylint: enable=line-too-long
 _BQ_RANDOM_SAMPLE_QUERY_TMPL: str = f"""
@@ -48,8 +48,8 @@ _BQ_RANDOM_SAMPLE_QUERY_TMPL: str = f"""
 """
 Uses `SELECT`_ statement using `TABLESAMPLE`_ operator.
 
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. TABLESAMPLE: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _TABLESAMPLE: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
 """
 # pylint: enable=line-too-long
 
@@ -62,9 +62,9 @@ _BQ_SORTED_SAMPLE_QUERY_TMPL: str = f"""
 """
 Uses `SELECT`_ statement `ORDER BY`_ clause.
 
-.. INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. ORDER BY: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#order_by_clause
+.. _INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _ORDER BY: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#order_by_clause
 """
 # pylint: enable=line-too-long
 
@@ -75,9 +75,9 @@ _BQ_INSERT_RANDOM_SAMPLE_QUERY_RAND_TMPL: str = (
 """
 Uses `INSERT`_ statements combined with `SELECT`_ statement using `TABLESAMPLE`_ operator.
 
-.. INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. RAND: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#rand
+.. _INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _RAND: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#rand
 """
 # pylint: enable=line-too-long
 _BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL: str = (
@@ -87,9 +87,9 @@ _BQ_INSERT_RANDOM_SAMPLE_QUERY_TMPL: str = (
 """
 Uses `INSERT`_ statements combined with `SELECT`_ statement using `TABLESAMPLE`_ operator.
 
-.. INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. TABLESAMPLE: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
+.. _INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _TABLESAMPLE: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
 """
 # pylint: enable=line-too-long
 
@@ -100,9 +100,9 @@ _BQ_INSERT_SORTED_SAMPLE_QUERY_TMPL: str = (
 """
 Uses `INSERT`_ statements combined with `SELECT`_ statement using `ORDER BY`_ clause.
 
-.. INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
-.. SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
-.. ORDER BY: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#order_by_clause
+.. _INSERT: https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#insert_statement
+.. _SELECT: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#select_list
+.. _ORDER BY: https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#order_by_clause
 """
 # pylint: enable=line-too-long
 

@@ -3,8 +3,8 @@
 """
 Reads an object from `Cloud Big Query`_ using `Python client`_.
 
-.. Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
-.. Python client: https://googleapis.dev/python/bigquery/latest/index.html
+.. _Cloud Big Query: https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-python
+.. _Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
 import re
