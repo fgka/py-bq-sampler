@@ -2,6 +2,7 @@
 """
 Processes a request coming from Cloud Function.
 """
+import logging
 import os
 import time
 from typing import Any, Dict, Optional, Tuple
@@ -115,9 +116,11 @@ def process(value: command.CommandBase, *, with_retry: Optional[bool] = True) ->
 
 
 @tenacity.retry(
+    reraise=True,
     retry=tenacity.retry_if_not_exception_type(ValueError),
     wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
     stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(_LOGGER, logging.INFO),
 )
 def _process_with_retry(value: command.CommandBase) -> None:
     _process(value)

@@ -7,7 +7,6 @@ Reads an object from `Cloud Big Query`_ using `Python client`_.
 .. _Python client: https://googleapis.dev/python/bigquery/latest/index.html
 """
 # pylint: enable=line-too-long
-import time
 from typing import Any, Callable, Dict, Generator, Mapping, Optional, Sequence, Tuple, Union
 
 import cachetools
