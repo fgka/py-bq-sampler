@@ -81,12 +81,12 @@ terraform init
 
 ## Deploy
 
-*NOTE*: if you just recently enabled ``bigquerydatatransfer.googleapis.com``,
-the system service account might be created yet and your Terraform deployment might fail due to
+**NOTE**: if you just recently enabled ``bigquerydatatransfer.googleapis.com``,
+the system service account might **not** be created yet and your Terraform deployment might fail due to
 ``service-YOUR_PROJECT_NUMBER@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com``
 not found or permission denied.
 This is expected and it does happen.
-You can force the creation of the service account by manually creating a 
+You can force the creation of the service accounts by manually creating a 
 bogus transfer on each account.
 To do that follow instructions starting at [What is BigQuery Data Transfer Service?](https://cloud.google.com/bigquery/docs/dts-introduction)
 
