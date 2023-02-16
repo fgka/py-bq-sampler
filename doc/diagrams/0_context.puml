@@ -1,0 +1,30 @@
+' https://github.com/tupadr3/plantuml-icon-font-sprites
+' https://github.com/Crashedmind/PlantUML-icons-GCP
+@startuml System Context
+!include <C4/C4_Container>
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons2
+!include DEVICONS/python.puml
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include FONTAWESOME/users.puml
+!define GCPPuml https://raw.githubusercontent.com/Crashedmind/PlantUML-icons-GCP/master/dist
+!include GCPPuml/GCPCommon.puml
+!include GCPPuml/Data_Analytics/BigQuery.puml
+
+Person(devOps, "DevOps", "DevOps operator", $sprite="users")
+Person(sci, "Data Science", "Data scientist", $sprite="users")
+System_Boundary(prodEnv, "Production environment:\nwhere the source data lives") {
+    Container(sampler, "BQ Sampler", "Google Cloud, Serverless, Python", "Google Cloud deployment", $sprite="python")
+    System(bqProd, "Production Big Query", "Big Query\nwhich contains\nproduction data\n(source)", $sprite="BigQuery")
+}
+System_Boundary(dsEnv, "Data Science environment:\nwhere the samples should land") {
+    System(bqDs, "Sample Big Query", "Big Query\nwhich contains\nsampled data\n(target)", $sprite="BigQuery")
+}
+
+Rel(devOps, sampler, "Approves/Manages sampling policies\nand permissions")
+Rel(sci, sampler, "Asks for samples\n(from production)")
+Rel(sampler, bqProd, "Issues approved\nsample requests")
+Rel(bqProd, bqDs, "Insert samples")
+Rel(sci, bqDs, "Explore and experiment\nwith samples")
+
+SHOW_LEGEND()
+@enduml

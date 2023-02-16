@@ -138,20 +138,20 @@ Tested with `PyCharm 2021.3.2 (Professional Edition)` for macOS.
 
 ### Menu `Run` click on `Edit Configurations...`:
 
-![menu](./doc/0_pycharm_run_menu.png)
+![menu](../doc/pycharm/0_pycharm_run_menu.png)
 
 ### Click `Edit configuration templates...`
 
-![template](./doc/1_pycharm_edit_template.png)
+![template](../doc/pycharm/1_pycharm_edit_template.png)
 
 ### Select `Python tests/Autodetect`
 
 Add `--no-cov` to `Additional Arguments` field:
 
-![autodetect](./doc/2_pycharm_autodetect_template.png)
+![autodetect](../doc/pycharm/2_pycharm_autodetect_template.png)
 
 ### Select `Python tests/pytest`
 
 Add `--no-cov` to `Additional Arguments` field:
 
-![pytest](./doc/3_pycharm_pytest_template.png)
+![pytest](../doc/pycharm/3_pycharm_pytest_template.png)
