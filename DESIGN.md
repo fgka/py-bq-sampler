@@ -3,11 +3,45 @@
 Below are the different documentation to explain the design behind the code
 and, in this sense, guide the validation of it.
 
+The below diagrams follows the [C4 model](https://c4model.com/) 
+and used [PlantUML](https://plantuml.com/) and [draw.io](https://draw.io) for drawing them.
+
+## System Context
+
+In this diagram we show how the main stakeholders interact with the sampler as a whole.
+This is 10,000 miles view.
+
+![img](./doc/diagrams/0_System_Context.png)
+
+[Source](./doc/diagrams/0_context.puml) ([PlantUML](https://plantuml.com/))
+
+## Container
+
+In this diagram we expand the Sampler application to show which are the main Google Cloud resources
+it interacts with.
+
+![img](./doc/diagrams/1_Container.png)
+
+[Source](./doc/diagrams/1_container.puml) ([PlantUML](https://plantuml.com/))
+
+## Components
+
+In the diagram below, now with much more infrastructure details,
+we _multiplied_ the PubSub topic and Cloud Function for clarity purposes.
+The ``Command Topic`` components are all the same PubSub topic receiving different commands.
+Also, the ``Sampler`` function is a single function but in different _roles_.
+
+![img](./doc/diagrams/2_Components.png)
+
+[Source](./doc/diagrams/2_component.puml) ([PlantUML](https://plantuml.com/))
+
 ## Request processing
 
-![img](doc/High%20level%20request%20flow.drawio.png)
+Here is logical sequence, ignoring the infrastructure backing it, of a sample cycle.
 
-[Source](doc/High%20level%20request%20flow.drawio) ([draw.io](https://draw.io))
+![img](./doc/diagrams/3_high_level_request_flow.png)
+
+[Source](./doc/diagrams/3_high_level_request_flow.drawio) ([draw.io](https://draw.io))
 
 ## Pseudo-algorithm for policy compliance
 
@@ -140,8 +174,9 @@ Given the above, the equivalent full compliant request to be processed is:
 }
 ```
 
-## Infrastructure
+## References
 
-![img](doc/DataScienceEnvDesign.drawio.png)
-
-[Source](doc/DataScienceEnvDesign.drawio) ([draw.io](https://draw.io))
+* [C4 model](https://c4model.com/);
+* [draw.io](https://draw.io);
+* [PlantUML](https://plantuml.com/);
+* [sequencediagram.org](https://sequencediagram.org/).

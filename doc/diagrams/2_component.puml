@@ -1,0 +1,57 @@
+' https://github.com/tupadr3/plantuml-icon-font-sprites
+' https://github.com/Crashedmind/PlantUML-icons-GCP
+@startuml Container
+!include <C4/C4_Container>
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons2
+!include DEVICONS/python.puml
+!define GCPPuml https://raw.githubusercontent.com/Crashedmind/PlantUML-icons-GCP/master/dist
+!include GCPPuml/GCPCommon.puml
+!include GCPPuml/Data_Analytics/Cloud_PubSub.puml
+!include GCPPuml/Data_Analytics/BigQuery.puml
+!include GCPPuml/Developer_Tools/Cloud_Scheduler.puml
+!include GCPPuml/Storage/Cloud_Storage.puml
+
+System_Boundary(prodEnv, "Production environment:\nwhere the source data lives") {
+    'Sampler
+    Container(samplerStart, "Sampler\n(Start)", "API: Python", "Processing CMD:\nSTART SAMPLE", $sprite="python")
+    Container(samplerReq, "Sampler\n(Sample request,\ntable <X>)", "API: Python", "Processing CMD:\nSAMPLE TABLE <X>", $sprite="python")
+    Container(samplerTrans, "Sampler\n(Transfer sample <X>\nto region <Y>)", "API: Python", "Processing CMD:\nTRANSFER SAMPLE <X>\nTO REGION <Y>", $sprite="python")
+    'Scheduler
+    System(trigger, "Sample trigger", "Triggers, on a regular basis, new sample cycle\n(cronjob)", $sprite="Cloud_Scheduler")
+    'PubSub
+    System(cmdStart, "Command Topic (start)", "Receives start command to initiate the whole sampling cycle", $sprite="Cloud_PubSub")
+    System(cmdReq, "Command Topic (requests)", "Receives individual sample requests (per table)", $sprite="Cloud_PubSub")
+    System(cmdTrans, "Command Topic (x-region transfers)", "Receives transfer requests for moving sampled tables to desired region", $sprite="Cloud_PubSub")
+    'Bucket
+    System(policies, "Sample Policies", "Sample policies use to\napprove/restrict/deny a sample request", $sprite="Cloud_Storage")
+    'BQ
+    System(bqProd, "Production Big Query", "Big Query\nwhich contains\nproduction data\n(source)", $sprite="BigQuery")
+}
+System_Boundary(dsEnv, "Data Science environment:\nwhere the samples should land") {
+    'Bucket
+    System(requests, "Sample Requests", "Sample requests issued by scientists", $sprite="Cloud_Storage")
+    'BQ
+    System(bqDs, "Sample Big Query", "Big Query\nwhich contains\nsampled data\n(target)", $sprite="BigQuery")
+}
+
+'Start
+Rel(trigger, cmdStart, "Start sample")
+Rel(cmdStart, samplerStart, "CMD: START SAMPLE")
+Rel(samplerStart, bqDs, "Clean up all previous samples,\naka: DROP TABLE")
+Rel(samplerStart, requests, "Read all requests")
+Rel(samplerStart, policies, "Read all policies")
+Rel(samplerStart, cmdReq, "For each valid request,\nissue CMD:\nSAMPLE TABLE <X>")
+'Sample table X
+Rel(cmdReq, samplerReq, "Sends CMD:\nSAMPLE TABLE <X>")
+Rel(samplerReq, bqProd, "Query: SELECT FROM TABLE <X>")
+Rel(bqProd, bqDs, "Query: INSERT INTO TABLE <X>")
+'X-region transfer
+Rel(samplerReq, bqDs, "Sends CMD:\nTRANSFER SAMPLE <X>\nTO REGION <Y>\n(If, and only if, table X is in a different region than desired)")
+Rel(bqDs, bqDs, "Transfers sample from original region <Z> to desired <Y>")
+Rel(bqDs, cmdTrans, "Notifies when x-region transfer is finished")
+Rel(cmdTrans, samplerTrans, "Transfer of sample <X> from <Z> to <Y> is finished")
+Rel(samplerTrans, bqDs, "Clean-up transfer leftovers")
+
+
+SHOW_LEGEND()
+@enduml

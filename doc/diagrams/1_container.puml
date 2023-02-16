@@ -1,0 +1,42 @@
+' https://github.com/tupadr3/plantuml-icon-font-sprites
+' https://github.com/Crashedmind/PlantUML-icons-GCP
+@startuml Container
+!include <C4/C4_Container>
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons2
+!include DEVICONS/python.puml
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include FONTAWESOME/users.puml
+!define GCPPuml https://raw.githubusercontent.com/Crashedmind/PlantUML-icons-GCP/master/dist
+!include GCPPuml/GCPCommon.puml
+!include GCPPuml/Data_Analytics/BigQuery.puml
+!include GCPPuml/Developer_Tools/Cloud_Scheduler.puml
+!include GCPPuml/Storage/Cloud_Storage.puml
+
+Person(devOps, "DevOps", "DevOps operator", $sprite="users")
+Person(sci, "Data Science", "Data scientist", $sprite="users")
+System_Boundary(prodEnv, "Production environment:\nwhere the source data lives") {
+    Container(sampler, "Sampler Cloud Function", "API: Python", "Processes sample requests", $sprite="python")
+    System(trigger, "Sample trigger", "Triggers, on a regular basis, new sample cycle\n(cronjob)", $sprite="Cloud_Scheduler")
+    System(policies, "Sample Policies", "Sample policies use to\napprove/restrict/deny a sample request", $sprite="Cloud_Storage")
+    System(bqProd, "Production Big Query", "Big Query\nwhich contains\nproduction data\n(source)", $sprite="BigQuery")
+}
+System_Boundary(dsEnv, "Data Science environment:\nwhere the samples should land") {
+    System(requests, "Sample Requests", "Sample requests issued by scientists", $sprite="Cloud_Storage")
+    System(bqDs, "Sample Big Query", "Big Query\nwhich contains\nsampled data\n(target)", $sprite="BigQuery")
+}
+
+'Setting policies and requests
+Rel(devOps, policies, "Approves/Manages sampling policies")
+Rel(sci, requests, "Asks for samples\n(from production)")
+'Sample request/policy
+Rel(trigger, sampler, "Start sample")
+Rel(sampler, requests, "Read all requests")
+Rel(sampler, policies, "Read all policies")
+'Sample actual request
+Rel(sampler, bqProd, "Issues approved\nsample requests")
+Rel(bqProd, bqDs, "Insert approved samples")
+'Post sample
+Rel(sci, bqDs, "Explore and experiment\nwith samples")
+
+SHOW_LEGEND()
+@enduml
