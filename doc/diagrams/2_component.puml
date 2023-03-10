@@ -35,22 +35,22 @@ System_Boundary(dsEnv, "Data Science environment:\nwhere the samples should land
 }
 
 'Start
-Rel(trigger, cmdStart, "Start sample")
-Rel(cmdStart, samplerStart, "CMD: START SAMPLE")
-Rel(samplerStart, bqDs, "Clean up all previous samples,\naka: DROP TABLE")
-Rel(samplerStart, requests, "Read all requests")
-Rel(samplerStart, policies, "Read all policies")
-Rel(samplerStart, cmdReq, "For each valid request,\nissue CMD:\nSAMPLE TABLE <X>")
+Rel(trigger, cmdStart, "Starts sample")
+Rel(cmdStart, samplerStart, "Sends CMD: START SAMPLE")
+Rel(samplerStart, bqDs, "Cleans up all previous samples,\naka: DROP TABLE")
+Rel(samplerStart, requests, "Reads all requests")
+Rel(samplerStart, policies, "Reads all policies")
+Rel(samplerStart, cmdReq, "For each valid request,\nissues CMD:\nSAMPLE TABLE <X>")
 'Sample table X
 Rel(cmdReq, samplerReq, "Sends CMD:\nSAMPLE TABLE <X>")
-Rel(samplerReq, bqProd, "Query: SELECT FROM TABLE <X>")
-Rel(bqProd, bqDs, "Query: INSERT INTO TABLE <X>")
+Rel(samplerReq, bqProd, "Issues query: SELECT FROM TABLE <X>")
+Rel(bqProd, bqDs, "Issues query: INSERT INTO TABLE <X>")
 'X-region transfer
 Rel(samplerReq, bqDs, "Sends CMD:\nTRANSFER SAMPLE <X>\nTO REGION <Y>\n(If, and only if, table X is in a different region than desired)")
 Rel(bqDs, bqDs, "Transfers sample from original region <Z> to desired <Y>")
 Rel(bqDs, cmdTrans, "Notifies when x-region transfer is finished")
-Rel(cmdTrans, samplerTrans, "Transfer of sample <X> from <Z> to <Y> is finished")
-Rel(samplerTrans, bqDs, "Clean-up transfer leftovers")
+Rel(cmdTrans, samplerTrans, "Informs that transfer of sample <X> from <Z> to <Y> is finished")
+Rel(samplerTrans, bqDs, "Cleans up transfer leftovers")
 
 
 SHOW_LEGEND()

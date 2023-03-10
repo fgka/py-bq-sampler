@@ -23,8 +23,8 @@ System_Boundary(dsEnv, "Data Science environment:\nwhere the samples should land
 Rel(devOps, sampler, "Approves/Manages sampling policies\nand permissions")
 Rel(sci, sampler, "Asks for samples\n(from production)")
 Rel(sampler, bqProd, "Issues approved\nsample requests")
-Rel(bqProd, bqDs, "Insert samples")
-Rel(sci, bqDs, "Explore and experiment\nwith samples")
+Rel(bqProd, bqDs, "Inserts samples")
+Rel(sci, bqDs, "Explores and experiment\nwith samples")
 
 SHOW_LEGEND()
 @enduml
